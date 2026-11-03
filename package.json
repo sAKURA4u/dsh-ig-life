@@ -1,6 +1,6 @@
 {
   "name": "dsh-ig-life",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "把 DeepSeek 養進 Instagram —— a DSH bundle that gives an agent an Instagram life: DM bridge, plastic memory, daily rhythm, and its own diary posts.",
   "type": "module",
   "main": "./lib/index.js",
