@@ -1,0 +1,26 @@
+# ============================================================================
+# dsh-ig-life — 把 DeepSeek 養進 Instagram
+# ============================================================================
+# 這個檔案是「bundle 層」：被 profile 的 dsh.profile.bundles 收錄後，
+# 下面 insert 的 row 會疊在 profile 根之上。
+#
+# ⚠️ row 的 id 用 `ig-life`；使用者在 ~/.dsh/profiles/<name>/cordis.patch.yml
+#    裡要覆寫設定時，就是打 `- id: ig-life` + 完整 config。
+# ⚠️ patch 是「整行取代」，不是深層合併 —— 覆寫時要重寫整個 config 物件。
+#    建議做法：先跑一次 `dsh-ig-life` 預設值，再把想改的欄位整份貼過來。
+#
+# 預設設定是「安全模式」：
+#   · transport: dryrun（不會真的發任何東西，只寫 data/outbox.jsonl）
+#   · life.enabled: false（不會自己主動發訊息）
+# 想真正上線，請在 profile patch 裡覆寫成：
+#   - id: ig-life
+#     config:
+#       transport: graph
+#       ownerHandle: your_main_account
+#       allowlist: [your_main_account]
+#       graph: { accessToken: '...', igUserId: '...', verifyToken: '...' }
+#       life: { enabled: true }
+- insert:
+    - id: ig-life
+      name: dsh-ig-life
+      config: {}
