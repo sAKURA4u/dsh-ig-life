@@ -37,6 +37,13 @@
 
 `containsSecret()` 是對應的偵測函式，測試 `test/gate.test.js` 釘住它。
 
+### 帳密在 GUI 設定時會經過什麼
+
+DSH 設定頁 → 插件的 `/ig-life/console/api/account` → sidecar 的 `/credentials`。
+密碼只經過插件的記憶體一次：**不寫 log、不寫檔、不回傳**，頁面的密碼欄位存檔後即清空；
+`GET /credentials` 只會回 `hasCredentials` 與 username。真正落地的是 sidecar 的
+`ig-secrets.json`（0600）。會改狀態的 POST 都要求同源（`Origin`／`Sec-Fetch-Site`），
+單靠 loopback 不足夠。
 **注意**：這是防護，不是萬能。真正的界線是 persona 的 `boundaries.md` ——
 模型不該先產生那些內容。
 

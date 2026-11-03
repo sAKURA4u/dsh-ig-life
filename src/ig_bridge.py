@@ -870,6 +870,53 @@ class Bridge:
                 raise _map_exception(error)
         return {"ok": True, "id": str(_get(comment, "pk", "") or _get(comment, "id", "") or "")}
 
+    # ---- credentials (the settings page's account section) ---------------
+    def credentials_payload(self) -> dict:
+        """
+        What the page may know: whether a password is set, and the username.
+        The password itself never leaves this process — not masked, not at all.
+        """
+        secret_file = self.data_dir / "ig-secrets.json"
+        data = load_json(secret_file, {}) or {}
+        username = str(data.get("username") or os.environ.get("IG_USERNAME") or "").strip().lstrip("@")
+        has_password = bool(str(data.get("password") or os.environ.get("IG_PASSWORD") or ""))
+        return {
+            "ok": True,
+            "hasCredentials": bool(username and has_password),
+            "username": username or None,
+            "file": str(secret_file),
+        }
+
+    def save_credentials(self, payload: dict) -> dict:
+        username = str(payload.get("username") or "").strip().lstrip("@")
+        password = str(payload.get("password") or "")
+        if not username:
+            raise BridgeError("IG_NO_CREDENTIALS", "username 不能空白", "填小號的 IG 使用者名稱（不用 @）", 400)
+        if not password:
+            # Blank password on a later save means "keep the stored one".
+            existing = load_json(self.data_dir / "ig-secrets.json", {}) or {}
+            password = str(existing.get("password") or "")
+            if not password:
+                raise BridgeError("IG_NO_CREDENTIALS", "password 不能空白", "第一次設定要輸入密碼；之後留空表示沿用舊密碼", 400)
+        secure_write(
+            self.data_dir / "ig-secrets.json",
+            json.dumps({"username": username, "password": password}, ensure_ascii=False, indent=2) + "\n",
+        )
+        with self._api_lock:
+            # A different account means the old client belongs to somebody else.
+            if self._username and self._username.lower() != username.lower():
+                self._client = None
+                self._session_note = "unknown"
+        log.info("credentials saved for @%s（密碼不會寫入 log）", username)
+        return {"ok": True, "username": username, "hasCredentials": True}
+
+    def login(self) -> dict:
+        """Log in now if we are not already logged in. Reuses the session first."""
+        with self._api_lock:
+            if self._client is None:
+                self.ensure_client()
+            return self.health()
+
     # ---- health -----------------------------------------------------------
     def health(self) -> dict:
         # `_api_lock` first, then `_roll_day()` takes `_lock`: the same order as
@@ -964,6 +1011,15 @@ class Handler(BaseHTTPRequestHandler):
             if method == "GET" and route == "/messages":
                 self._send_json(200, bridge.poll())
                 return
+            if method == "GET" and route == "/credentials":
+                self._send_json(200, bridge.credentials_payload())
+                return
+            if method == "POST" and route == "/credentials":
+                self._send_json(200, bridge.save_credentials(self._read_body()))
+                return
+            if method == "POST" and route == "/login":
+                self._send_json(200, bridge.login())
+                return
             if method == "POST" and route == "/send":
                 self._send_json(200, bridge.send(self._read_body()))
                 return
@@ -976,7 +1032,7 @@ class Handler(BaseHTTPRequestHandler):
             if method == "POST" and route == "/reply_comment":
                 self._send_json(200, bridge.reply_comment(self._read_body()))
                 return
-            raise BridgeError("IG_NOT_FOUND", f"沒有這個 route：{method} {route}", "GET /health /messages；POST /send /send_media /post /reply_comment", 404)
+            raise BridgeError("IG_NOT_FOUND", f"沒有這個 route：{method} {route}", "GET /health /messages /credentials；POST /send /send_media /post /reply_comment /credentials /login", 404)
         except BridgeError as error:
             log.warning("%s %s → %s %s", method, self.path, error.code, error.message)
             self._send_json(error.status, error.payload())

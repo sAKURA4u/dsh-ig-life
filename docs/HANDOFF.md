@@ -190,7 +190,9 @@ Creator／Business，所以「像 QQ 那樣用普通帳號」只有私有 API �
 |---|---|
 | `lib/settings.js` | 三層合併的第三層：白名單欄位、`resolveConfig` 驗證、只寫使用者改過的 path |
 | `lib/client.js` | 手寫的 DSH client bundle（`window.__ModuleLoader__.load` + lazy CJS factory），無 build step |
-| `lib/console.js` | `/ig-life/console/api/settings`（GET 讀 effective + saved，POST 驗證並寫檔） |
+| `lib/console.js` | `/ig-life/console/api/settings`（設定）與 `/api/account`（帳密代理） |
+| `lib/transport/unofficial.js` | `credentials()` / `saveCredentials()` / `login()`，對應 sidecar 的三條新路由 |
+| `src/ig_bridge.py` | `GET/POST /credentials`、`POST /login`；唯一寫 `ig-secrets.json` 的進程 |
 | `package.json` | `exports["./client"]` + `dsh.client.platform: "web"` |
 
 ### 決定
@@ -201,9 +203,17 @@ Creator／Business，所以「像 QQ 那樣用普通帳號」只有私有 API �
 2. **只寫使用者改過的 path**。第一版寫整個 projection，結果把今日的預設值烙進檔案、還把
    上一次的 ownerHandle 蓋成 `''`（測試抓到）。現在 `providedPaths()` + `subsetOf()` 只留
    提交過的葉節點。
-3. **永遠冇 secret**：`EDITABLE` 不含 token／密碼，`graph.accessToken` 寫入會被丟棄（有測試）。
-4. **client bundle 包 error boundary**：註冊或 render 失敗只影響這一頁，不會拖死設定面板。
-5. **console 唔再依附 webhook**：`/ig-life/console`、`/ig-life/media` 只要有 webServer 就掛。
+3. **永久設定層冇 secret**：`EDITABLE` 不含 token／密碼，`graph.accessToken` 寫入會被丟棄（有測試）。
+4. **帳密是例外，但只經手不落地**：頁面 → 插件 → sidecar，只有 sidecar 寫 `ig-secrets.json`（0600）。
+   插件唔存、唔 log、唔回傳，頁面存檔後清空欄位；`GET /credentials` 只回 `hasCredentials` + username。
+   呢個係刻意接受的取捨：DSH 的頁面同 sidecar 之間冇其他安全通道，而 loopback + token + 同源
+   檢查已是能拿到的全部。**唔好**把這段改成「插件自己存一份」。
+5. **`POST /login` 才會登入**：sidecar 平常仍是 lazy（第一次 poll 才 `ensure_client`）。按鈕叫它
+   即刻試，session 優先；重新登入受 10 分鐘退避保護。存好之後，之後每次啟動都自動重用 session。
+6. **同源檢查**：所有改狀態的 POST 要 `Origin`／`Sec-Fetch-Site` 同源 —— loopback 本身唔夠，
+   本機任何程式都連得到 127.0.0.1。
+7. **client bundle 包 error boundary**：註冊或 render 失敗只影響這一頁，不會拖死設定面板。
+8. **console 唔再依附 webhook**：`/ig-life/console`、`/ig-life/media` 只要有 webServer 就掛。
 
 ### 已驗證（用 app 自己的 0.2.1 runtime，隔離 DSH_HOME 預檢）
 
@@ -214,17 +224,21 @@ POST → {ok:true, changed:["transport","ownerHandle","limits.dmPerDay"], restar
 重啟後 GET → effective.transport = "unofficial"、dmPerDay = 9   ← 使用者層真的生效
 ```
 
+帳密那條線由測試釘住：sidecar 寫入 0600、回應冇密碼、空白密碼沿用舊的、插件 outbox 冇痕跡、
+跨源 POST 403。JS 207 個測試、Python 38 個。
+
 ### 未做
 
 - 未在**真實 GUI** 內按過那一頁（預檢只證明 bundle 入 graph、API 通；React 渲染要人眼）。
   如果頁面空白：DevTools（Ctrl+Shift+I）看 `[ig-life] settings section not registered`。
+- 未用真實帳號行過「儲存並登入」（冇帳號）：實際登入錯誤碼會由 `IG_CHALLENGE_REQUIRED` 等回傳。
 - 設定頁只覆蓋常用欄位；Graph token／voice／stickers 仍在 YAML。
 
 ---
 
 ## 4. 現況基線
 
-- **199 個 JS 測試** + **34 個 Python sidecar 測試**，全綠
+- **207 個 JS 測試** + **38 個 Python sidecar 測試**，全綠
 - `node scripts/loader-smoke.mjs`（真 Cordis）全綠
 - CI：Node 20/22/24 × Ubuntu/Windows + 一個 `python sidecar` job（`py_compile` + stdlib 測試）
 - Release：`v0.3.0`；CHANGELOG 中英

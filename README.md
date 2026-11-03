@@ -109,12 +109,20 @@ touched. [The full warning and setup →](docs/UNOFFICIAL.md)
 
 ### ⚙️ Settings, in the GUI
 
-The plugin contributes its own page to **DSH → Settings → Instagram 人生**: transport,
-owner handle, allowlist, the daily rhythm, the caps and the sidecar address. Saving writes
-`<dataDir>/settings.json` (only those fields — never a token) and the page says plainly that
-a restart applies it. The same data is editable from `/ig-life/console` if the page is not
-mounted (a bundle that fails to register leaves the rest of Settings alone: the page is
-wrapped in its own error boundary).
+The plugin contributes its own page to **DSH → Settings → Instagram 人生**:
+
+- **Account** — the character's IG username and password, plus **Save and log in**. The
+  sidecar owns the file (`ig-secrets.json`, 0600); the password passes through the plugin
+  process on its way there but is never logged, stored or echoed, and the page's field is
+  cleared after saving. Once stored, a restart reuses the session automatically.
+- **Behaviour** — transport, owner handle, allowlist, the daily rhythm, the caps and the
+  sidecar address. Saving writes `<dataDir>/settings.json` (only those fields — never a
+  token) and the page says plainly that a restart applies it.
+- Every field carries a sentence explaining what it does and what it costs.
+
+The same data is editable from `/ig-life/console` if the page is not mounted (a bundle that
+fails to register leaves the rest of Settings alone: the page is wrapped in its own error
+boundary).
 
 <details>
 <summary><b>📝 Configuration (click)</b></summary>

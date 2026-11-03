@@ -212,6 +212,45 @@ class SidecarTest(unittest.TestCase):
         self.assertEqual(payload["session"], "reused")
         self.assertEqual(payload["sendPerDay"], 5)
 
+    # ---- credentials
+    def test_credentials_are_stored_but_never_returned(self):
+        status, payload = self.request("GET", "/credentials")
+        self.assertEqual(status, 200)
+        self.assertFalse(payload["hasCredentials"])
+
+        status, payload = self.request("POST", "/credentials", {"username": "@tester", "password": "s3cret"})
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["username"], "tester")
+        self.assertNotIn("s3cret", json.dumps(payload), "the password must never cross the wire")
+
+        stored = json.loads((self.data_dir / "ig-secrets.json").read_text(encoding="utf-8-sig"))
+        self.assertEqual(stored, {"username": "tester", "password": "s3cret"})
+        if os.name != "nt":
+            self.assertEqual((self.data_dir / "ig-secrets.json").stat().st_mode & 0o777, 0o600)
+
+        status, payload = self.request("GET", "/credentials")
+        self.assertTrue(payload["hasCredentials"])
+        self.assertEqual(payload["username"], "tester")
+        self.assertNotIn("s3cret", json.dumps(payload))
+
+    def test_a_blank_password_keeps_the_stored_one(self):
+        self.request("POST", "/credentials", {"username": "tester", "password": "first"})
+        status, _ = self.request("POST", "/credentials", {"username": "tester", "password": ""})
+        self.assertEqual(status, 200)
+        stored = json.loads((self.data_dir / "ig-secrets.json").read_text(encoding="utf-8-sig"))
+        self.assertEqual(stored["password"], "first")
+
+    def test_a_first_save_without_a_password_is_refused(self):
+        status, payload = self.request("POST", "/credentials", {"username": "tester"})
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["code"], "IG_NO_CREDENTIALS")
+
+    def test_login_reports_an_already_connected_client(self):
+        status, payload = self.request("POST", "/login")
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["loggedIn"])
+        self.assertFalse(payload["needsLogin"])
+
     # ---- inbound
     def test_messages_drops_our_own_and_keeps_the_rest(self):
         status, payload = self.request("GET", "/messages")

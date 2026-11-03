@@ -301,6 +301,42 @@ test('replying to a comment without a media id is refused with the reason', asyn
   )
 })
 
+// ------------------------------------------------------------------- account
+test('credentials are read without ever carrying the password', async () => {
+  const fetchImpl = fakeFetch({ 'GET /credentials': { ok: true, hasCredentials: true, username: 'alice', file: 'x' } })
+  const { transport } = await harness({ fetchImpl })
+  const account = await transport.credentials()
+  assert.equal(account.username, 'alice')
+  assert.equal(account.hasCredentials, true)
+  assert.ok(!JSON.stringify(account).toLowerCase().includes('password'))
+})
+
+test('saving credentials posts them once and leaves no trace in the outbox', async () => {
+  const fetchImpl = fakeFetch({ 'POST /credentials': { ok: true, username: 'alice' } })
+  const { store, transport } = await harness({ fetchImpl })
+  await transport.saveCredentials({ username: '@Alice', password: 's3cret' })
+  assert.equal(fetchImpl.last().body.username, 'Alice', 'the handle is normalised')
+  assert.equal(fetchImpl.last().body.password, 's3cret')
+  const lines = await store.readLines('outbox.jsonl', 10)
+  assert.equal(lines.length, 0, 'credentials are not an outbound message')
+  assert.ok(!JSON.stringify(lines).includes('s3cret'))
+})
+
+test('login asks the sidecar and reports the session it got', async () => {
+  const fetchImpl = fakeFetch({ 'POST /login': { ok: true, loggedIn: true, username: 'alice', session: 'reused' } })
+  const { transport } = await harness({ fetchImpl })
+  const result = await transport.login()
+  assert.equal(result.loggedIn, true)
+  assert.equal(result.session, 'reused')
+})
+
+test('an empty username never reaches the sidecar', async () => {
+  const fetchImpl = fakeFetch({})
+  const { transport } = await harness({ fetchImpl })
+  await assert.rejects(() => transport.saveCredentials({ username: '  ', password: 'x' }), (error) => error.code === 'IG_NO_CREDENTIALS')
+  assert.equal(fetchImpl.calls.length, 0)
+})
+
 // ----------------------------------------------------------------------- polling
 test('a polled message looks exactly like a webhook event', async () => {
   const fetchImpl = fakeFetch({

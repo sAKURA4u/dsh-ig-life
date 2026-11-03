@@ -105,9 +105,14 @@ dsh plugin --profile web add /path/to/dsh-ig-life
 
 ### ⚙️ 直接喺 GUI 改設定
 
-插件會在 **DSH → 設定 → Instagram 人生** 加一頁：身體（transport）、主人帳號、白名單、
-生命節奏、每日額度、sidecar 位址。存檔寫入 `<dataDir>/settings.json`（只寫這些欄位，
-**永遠唔會寫 token／密碼**），頁面會講清楚「重啟 DSH 後生效」。
+插件會在 **DSH → 設定 → Instagram 人生** 加一頁：
+
+- **帳號** — 角色的 IG 使用者名稱同密碼，加一個「儲存並登入」。檔案由 sidecar 保管
+  （`ig-secrets.json`，0600）；密碼只係經過 Node 轉去 sidecar，**唔會寫 log、唔會落地、唔會回傳**，
+  存檔後欄位即清空。存好之後，重啟會自動重用 session，唔需要再登入。
+- **行為** — 身體（transport）、主人帳號、白名單、生命節奏、每日額度、sidecar 位址。
+  存檔寫入 `<dataDir>/settings.json`（只寫這些欄位，**永遠唔會寫 token**）。
+- 每個選項下面都有一句說明：它做什麼、代價是什麼。
 
 如果嗰頁冇出現（例如 client bundle 註冊失敗），`/ig-life/console` 一樣改得到；
 整頁包在自己的 error boundary 裡，壞掉都唔會拖死其他設定頁。

@@ -99,22 +99,22 @@ test('the editable projection carries no secret-bearing key', () => {
 })
 
 // ------------------------------------------------------------------ console API
-function fakeConsole(dir) {
+function fakeConsole(dir, transportOverrides = null, routePath = '/ig-life/console/api/settings') {
   const routes = createConsole({
-    bridge: { status: () => ({}) , recentInbox: () => [] },
+    bridge: { status: () => ({}), recentInbox: () => [] },
     life: null,
     stickers: null,
     slang: null,
     people: null,
     voice: null,
     memory: { stats: () => ({}) },
-    transport: { health: async () => ({ ok: true, backend: 'dryrun' }) },
+    transport: { health: async () => ({ ok: true, backend: 'dryrun' }), ...(transportOverrides ?? {}) },
     config: { ...resolveConfig({ transport: 'dryrun' }).config },
     dataDir: dir,
     logger: () => {},
   })
-  const route = routes.find((entry) => entry.path === '/ig-life/console/api/settings')
-  assert.ok(route, 'the settings route exists')
+  const route = routes.find((entry) => entry.path === routePath)
+  assert.ok(route, `the ${routePath} route exists`)
   return route.handler
 }
 
@@ -178,6 +178,103 @@ test('a non-loopback request is refused before anything is written', async () =>
   assert.equal(res.statusCode, 403)
   assert.equal(fs.existsSync(settingsFilePath(dir)), false)
 })
+
+// ---------------------------------------------------------------- account API
+test('the account route reports an unsupported transport', async () => {
+  const handler = fakeConsole(dataDir(), null, '/ig-life/console/api/account')
+  const res = fakeRes()
+  await handler(loopback, res)
+  const payload = JSON.parse(res.body)
+  assert.equal(payload.ok, true)
+  assert.equal(payload.supported, false)
+})
+
+test('the account route stores credentials and logs in when asked', async () => {
+  const calls = []
+  const handler = fakeConsole(
+    dataDir(),
+    {
+      credentials: async () => ({ ok: true, hasCredentials: false, username: null }),
+      saveCredentials: async ({ username, password }) => {
+        calls.push({ username, password })
+        return { ok: true, username, hasCredentials: true }
+      },
+      login: async () => {
+        calls.push({ login: true })
+        return { ok: true, loggedIn: true, session: 'fresh' }
+      },
+    },
+    '/ig-life/console/api/account',
+  )
+  const res = fakeRes()
+  await handler(
+    {
+      method: 'POST',
+      socket: { remoteAddress: '127.0.0.1' },
+      headers: {},
+      body: Buffer.from(JSON.stringify({ username: 'me', password: 'pw', login: true })),
+    },
+    res,
+  )
+  assert.equal(res.statusCode, 200)
+  const payload = JSON.parse(res.body)
+  assert.equal(payload.ok, true)
+  assert.equal(payload.account.loggedIn, true)
+  assert.deepEqual(calls[0], { username: 'me', password: 'pw' })
+  assert.ok(calls.some((call) => call.login === true))
+  assert.ok(!JSON.stringify(payload).includes('pw'), 'the response must not echo the password')
+})
+
+test('a blank password on a first save is a 400, not a silent empty file', async () => {
+  const handler = fakeConsole(
+    dataDir(),
+    {
+      credentials: async () => ({ ok: true }),
+      saveCredentials: async () => {
+        const error = new Error('password 不能空白')
+        error.code = 'IG_NO_CREDENTIALS'
+        error.status = 400
+        throw error
+      },
+    },
+    '/ig-life/console/api/account',
+  )
+  const res = fakeRes()
+  await handler(
+    { method: 'POST', socket: { remoteAddress: '127.0.0.1' }, headers: {}, body: Buffer.from(JSON.stringify({ username: 'me' })) },
+    res,
+  )
+  assert.equal(res.statusCode, 400)
+  assert.equal(JSON.parse(res.body).code, 'IG_NO_CREDENTIALS')
+})
+
+test('a cross-origin POST cannot change the account', async () => {
+  let called = false
+  const handler = fakeConsole(
+    dataDir(),
+    {
+      credentials: async () => ({ ok: true }),
+      saveCredentials: async () => {
+        called = true
+        return { ok: true }
+      },
+    },
+    '/ig-life/console/api/account',
+  )
+  const res = fakeRes()
+  await handler(
+    {
+      method: 'POST',
+      socket: { remoteAddress: '127.0.0.1' },
+      headers: { origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' },
+      body: Buffer.from(JSON.stringify({ username: 'me', password: 'pw' })),
+    },
+    res,
+  )
+  assert.equal(res.statusCode, 403)
+  assert.equal(called, false)
+})
+
 
 // ------------------------------------------------------- browser client bundle
 test('the hand-written client bundle registers a settings section', () => {

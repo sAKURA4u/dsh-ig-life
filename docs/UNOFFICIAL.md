@@ -70,6 +70,15 @@ python -m pip install -r src/requirements.txt
 
 資料夾預設是 `~/.dsh/ig-life/`（`DSH_HOME` 有設就跟著走）。
 
+**方法 A：喺 DSH 設定頁填（推薦）**
+
+DSH → 設定 → **Instagram 人生** → 帳號：填小號 username 同密碼，按「儲存並登入」。
+頁面 POST 去插件，插件再轉去 sidecar 的 `/credentials`；**只有 sidecar 會寫檔案**，
+插件唔會存、唔會 log、唔會回傳密碼，存檔後欄位即清空。之後每次啟動都會重用 session，
+唔需要再登入（session 真係失效才用密碼重登，並受 10 分鐘退避保護）。
+
+**方法 B：命令列**
+
 ```bash
 python src/ig_bridge.py --set-credentials
 ```
@@ -212,6 +221,9 @@ sidecar 自己另有 `--poll-seconds`（下限同樣 10）、`--send-per-day`、
 |---|---|---|---|
 | GET | `/health` | — | `{ok, loggedIn, needsLogin, username, session, sentToday, postToday, ...}` |
 | GET | `/messages` | — | `{ok, messages:[...], cursor, throttled, skippedGroups}` |
+| GET | `/credentials` | — | `{ok, hasCredentials, username, file}`（**永遠唔會回傳密碼**） |
+| POST | `/credentials` | `{username, password}` | `{ok, username, hasCredentials}`；空白 password＝沿用舊的 |
+| POST | `/login` | — | `{ok, loggedIn, username, session, ...}`；session 先、失效才用密碼 |
 | POST | `/send` | `{text, threadId?|userId?|username?}` | `{ok, id}` |
 | POST | `/send_media` | `{path, type:image|audio|video|file, text?, threadId?...}` | `{ok, id, textId, mode}` |
 | POST | `/post` | `{caption, imagePath}` | `{ok, mediaId, permalink}` |
