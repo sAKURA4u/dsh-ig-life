@@ -1,0 +1,23 @@
+# secrets & runtime data
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-wal
+session*.json
+credentials*.json
+.graph-token
+
+# node
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+npm-debug.log*
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
