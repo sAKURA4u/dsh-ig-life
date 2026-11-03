@@ -4,7 +4,7 @@
 
 ---
 
-## [0.3.0] — 2026-11-03
+## [0.3.0] — 2026-11-04
 
 第二副身體：**普通 IG 帳號**。官方 Graph API 只服務 Creator／Business 帳號，所以「像 QQ 那樣用
 一個普通帳號養 agent」只有非官方私有 API 一條路。這一版把它做成獨立、預設關閉的 transport。
@@ -75,6 +75,10 @@
   `mediaId` 才用得到。
 - 2FA 不支援；voice note 要 m4a／opus，TTS 的 mp3 會退回「檔案附件」。
 - 私有協議隨時會改。Instagram 一改簽名，登入就會壞，要等 instagrapi 更新 —— **壞了不保證修好**。
+- **密碼登入已被 IG 封**：Instagram 不再提供 `ig-set-password-encryption-key-id`，instagrapi
+  的 `password_publickeys()` 會 `int(None)`。請用 **sessionid** 登入（設定頁有欄位）。
+- **GUI 設定頁可能在部分環境空白**（section 註冊到但 component 不 render；診斷中）。
+  設定仍可用 `~/.dsh/ig-life/settings.json` 或 `/ig-life/console`。
 - 非官方帳號會封。用一個可以犧牲的小號，先 dryrun 觀察一個星期。
 
 ---
