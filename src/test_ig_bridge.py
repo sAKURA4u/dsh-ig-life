@@ -82,6 +82,18 @@ class FakeClient:
     def photo_upload(self, path, caption):
         return SimpleNamespace(pk="999", code="ABC123")
 
+    def photo_upload_to_story(self, path, caption=""):
+        self.last_story = (path, caption)
+        return SimpleNamespace(pk="111", code="STORY1")
+
+    def account_edit(self, **kwargs):
+        self.last_profile = kwargs
+        return True
+
+    def account_change_picture(self, path):
+        self.last_picture = path
+        return True
+
     def media_comment(self, media_id, text, replied_to_comment_id=None):
         return SimpleNamespace(pk="comment-1")
 
@@ -387,6 +399,29 @@ class SidecarTest(unittest.TestCase):
         status, payload = self.request("POST", "/reply_comment", {"commentId": "c1", "text": "hi"})
         self.assertEqual(status, 400)
         self.assertEqual(payload["code"], "IG_COMMENT_NEEDS_MEDIA")
+
+    def test_a_story_is_posted_from_a_local_image(self):
+        file = self._image(self.data_dir)
+        status, payload = self.request("POST", "/story", {"imagePath": str(file), "caption": "夜"})
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["mediaId"], "111")
+        self.assertEqual(self.fake.last_story[0], str(file))
+        self.assertEqual(self.fake.last_story[1], "夜")
+
+    def test_the_profile_can_be_edited(self):
+        status, payload = self.request("POST", "/profile", {"biography": "夜晚出沒", "name": "Norma"})
+        self.assertEqual(status, 200)
+        self.assertEqual(self.fake.last_profile, {"full_name": "Norma", "biography": "夜晚出沒"})
+
+    def test_an_empty_profile_edit_is_refused(self):
+        status, payload = self.request("POST", "/profile", {})
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["code"], "IG_EMPTY_PROFILE")
+
+    def test_a_bio_over_150_chars_is_refused(self):
+        status, payload = self.request("POST", "/profile", {"biography": "x" * 151})
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["code"], "IG_BIO_TOO_LONG")
 
     # ---- misc
     def test_unknown_route_is_a_404_with_a_code(self):

@@ -4,6 +4,30 @@
 
 ---
 
+## [0.4.0] — 未發佈
+
+### 新增
+
+- **隨機回覆延遲** — `bridge.replyDelaySeconds {min,max}`（預設 2–12 秒），收到訊息後先等一段隨機時間才開始想回覆；
+  設定頁可改。人可以一兩秒回，也可以隔幾分鐘才回，但唔會每次同一個節奏。
+- **Story** — `ig_story` 工具 + sidecar `POST /story`（`photo_upload_to_story`）。它可以發限時動態，
+  caption 可留空；計入每日發帖額度。
+- **改自己的 profile** — `ig_profile` 工具 + sidecar `POST /profile`：顯示名稱、bio（IG 上限 150 字）、頭像。
+  出站照樣過 `sanitizeOutbound`。
+- **人格可以在 GUI 改** — `/ig-life/console` 新增「人格」卡：`persona.md` / `style.md` / `boundaries.md`
+  三個 textarea。第一次編輯會把目前的人格複製到 `<dataDir>/persona/`，之後只改這份；
+  **打包附帶的範例人格永遠唔會被寫入**。存檔後重啟生效。
+- **console 修正** — 頁面內的 API 呼叫由相對路徑改成絕對路徑（頁面在 `/ig-life/console`，
+  相對路徑會打到 `/ig-life/api/*`），所以按鈕終於真的叫到後端。
+
+### 已知限制
+
+- Story 只支援圖片（`photo_upload_to_story`）；影片 story 未接。
+- `ig_profile` 改不到 username（IG 唔准經 API 改）。
+- 人格編輯要重啟 DSH 才生效（prompt 在 mount 時組好）。
+
+---
+
 ## [0.3.0] — 2026-11-04
 
 第二副身體：**普通 IG 帳號**。官方 Graph API 只服務 Creator／Business 帳號，所以「像 QQ 那樣用

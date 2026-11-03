@@ -65,6 +65,9 @@ This is not a support bot. It reaches out first, leaves you on read, refuses you
 | 🎬 **Reels** | read metadata + cover through a vision endpoint; sharing just sends the link and Instagram renders the card |
 | 📚 **Slang** | submit → the owner approves with `/slang ok <id>` → only then injected |
 | 👤 **Per-person memory** | impressions, open topics and details per handle; cross-thread leakage is blocked in code |
+| 🎞 **Stories** | `ig_story`: a photo story, caption optional |
+| 🪞 **Its own profile** | `ig_profile`: display name, bio, avatar |
+| ⏳ **A human reply pace** | a random 2–12 s pause before it starts thinking, never instant |
 
 ## 🧠 Memory: forgetting is what makes it human
 

@@ -242,6 +242,16 @@ POST → {ok:true, changed:["transport","ownerHandle","limits.dmPerDay"], restar
 
 ---
 
+## 3.5 新功能（0.4.0，未發佈）
+
+- 隨機回覆延遲：`bridge.replyDelaySeconds {min,max}`；`pauseBeforeReply()` 在 turn 之前等，
+  不在 send 之前等 —— 咁模型好似「啱啱睇完訊息」才開始想。
+- Story：`ig_story` → sidecar `/story`（`photo_upload_to_story`）；計入每日發帖額度。
+- 自己改 profile：`ig_profile` → `/profile`（`account_edit` + `account_change_picture`），bio 上限 150。
+- 人格 GUI：`/ig-life/console`「人格」卡；第一次編輯把目前人格複製到 `<dataDir>/persona/`，
+  打包的範例永遠唔會被寫（有測試）。
+- console 頁的 fetch 由相對改成絕對路徑（之前會打到 `/ig-life/api/*`，所以按鈕其實一直冇用）。
+
 ## 4. 現況基線
 
 - **207 個 JS 測試** + **38 個 Python sidecar 測試**，全綠

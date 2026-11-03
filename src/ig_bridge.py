@@ -903,6 +903,50 @@ class Bridge:
             "permalink": _shortcode_url(code),
         }
 
+    def story(self, payload: dict) -> dict:
+        """Post a photo to the story. Captions are optional there."""
+        path = self._resolve_media_path(str(payload.get("imagePath") or ""))
+        caption = str(payload.get("caption") or "").strip()
+        with self._api_lock:
+            client = self.ensure_client()
+            # Stories are not feed posts, but they are still a public act: bound
+            # them by the same daily ceiling.
+            self.check_cap("post")
+            try:
+                media = client.photo_upload_to_story(str(path), caption)
+            except Exception as error:
+                raise _map_exception(error)
+        code = str(_get(media, "code", "") or "")
+        return {
+            "ok": True,
+            "mediaId": str(_get(media, "pk", "") or _get(media, "id", "") or ""),
+            "permalink": _shortcode_url(code),
+        }
+
+    def profile(self, payload: dict) -> dict:
+        """Let the character edit its own profile: name, bio, avatar."""
+        name = payload.get("name")
+        biography = payload.get("biography")
+        photo = str(payload.get("photoPath") or "").strip()
+        if name is None and biography is None and not photo:
+            raise BridgeError("IG_EMPTY_PROFILE", "沒有要改的東西", "給 name、biography 或 photoPath", 400)
+        if biography is not None and len(str(biography)) > 150:
+            raise BridgeError("IG_BIO_TOO_LONG", "bio 超過 150 字", "IG 的上限是 150 字", 400)
+        photo_path = self._resolve_media_path(photo) if photo else None
+        with self._api_lock:
+            client = self.ensure_client()
+            try:
+                if photo_path is not None:
+                    client.account_change_picture(str(photo_path))
+                if name is not None or biography is not None:
+                    client.account_edit(
+                        full_name=None if name is None else str(name),
+                        biography=None if biography is None else str(biography),
+                    )
+            except Exception as error:
+                raise _map_exception(error)
+        return {"ok": True, "name": name, "biography": biography, "avatar": bool(photo_path)}
+
     def reply_comment(self, payload: dict) -> dict:
         text = str(payload.get("text") or "").strip()
         comment_id = str(payload.get("commentId") or "").strip()
@@ -1107,13 +1151,19 @@ class Handler(BaseHTTPRequestHandler):
             if method == "POST" and route == "/send_media":
                 self._send_json(200, bridge.send_media(self._read_body()))
                 return
+            if method == "POST" and route == "/story":
+                self._send_json(200, bridge.story(self._read_body()))
+                return
+            if method == "POST" and route == "/profile":
+                self._send_json(200, bridge.profile(self._read_body()))
+                return
             if method == "POST" and route == "/post":
                 self._send_json(200, bridge.post(self._read_body()))
                 return
             if method == "POST" and route == "/reply_comment":
                 self._send_json(200, bridge.reply_comment(self._read_body()))
                 return
-            raise BridgeError("IG_NOT_FOUND", f"沒有這個 route：{method} {route}", "GET /health /messages /credentials；POST /send /send_media /post /reply_comment /credentials /login", 404)
+            raise BridgeError("IG_NOT_FOUND", f"沒有這個 route：{method} {route}", "GET /health /messages /credentials；POST /send /send_media /post /story /profile /reply_comment /credentials /login", 404)
         except BridgeError as error:
             log.warning("%s %s → %s %s", method, self.path, error.code, error.message)
             self._send_json(error.status, error.payload())

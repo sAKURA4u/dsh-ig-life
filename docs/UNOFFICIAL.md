@@ -242,6 +242,8 @@ sidecar 自己另有 `--poll-seconds`（下限同樣 10）、`--send-per-day`、
 | POST | `/send` | `{text, threadId?|userId?|username?}` | `{ok, id}` |
 | POST | `/send_media` | `{path, type:image|audio|video|file, text?, threadId?...}` | `{ok, id, textId, mode}` |
 | POST | `/post` | `{caption, imagePath}` | `{ok, mediaId, permalink}` |
+| POST | `/story` | `{imagePath, caption?}` | `{ok, mediaId, permalink}` |
+| POST | `/profile` | `{name?, biography?, photoPath?}` | `{ok, name, biography, avatar}` |
 | POST | `/reply_comment` | `{commentId, mediaId, text}` | `{ok, id}` |
 
 `messages[]` 的形狀就是 webhook 正規化後的形狀（`id / threadId / senderId / username / text / at /

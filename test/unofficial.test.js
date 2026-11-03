@@ -301,6 +301,34 @@ test('replying to a comment without a media id is refused with the reason', asyn
   )
 })
 
+// --------------------------------------------------------------------- story
+test('a story is posted with the local image path and recorded', async () => {
+  const fetchImpl = fakeFetch({ 'POST /story': { ok: true, mediaId: 's1', permalink: 'https://www.instagram.com/p/s1/' } })
+  const { store, transport } = await harness({ fetchImpl })
+  const file = path.join(store.dir, 'story.png')
+  await fsp.writeFile(file, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]))
+
+  const result = await transport.postStory({ imagePath: file, caption: '夜' })
+  assert.equal(result.mediaId, 's1')
+  assert.equal(fetchImpl.last().body.imagePath, path.resolve(file))
+  assert.equal(fetchImpl.last().body.caption, '夜')
+  const [entry] = (await store.readLines('outbox.jsonl', 5)).slice(-1)
+  assert.equal(entry.kind, 'story')
+})
+
+test('the profile edit never sends a bio longer than 150 characters', async () => {
+  const fetchImpl = fakeFetch({ 'POST /profile': { ok: true, name: 'Norma', biography: 'x'.repeat(150) } })
+  const { transport } = await harness({ fetchImpl })
+  await transport.updateProfile({ name: 'Norma', biography: 'x'.repeat(300) })
+  assert.equal(fetchImpl.last().body.biography.length, 150)
+})
+
+test('an empty profile edit is refused before the request', async () => {
+  const fetchImpl = fakeFetch({})
+  const { transport } = await harness({ fetchImpl })
+  await assert.rejects(() => transport.updateProfile({}), (error) => error.code === 'IG_EMPTY_PROFILE')
+  assert.equal(fetchImpl.calls.length, 0)
+})
 // ------------------------------------------------------------------- account
 test('credentials are read without ever carrying the password', async () => {
   const fetchImpl = fakeFetch({ 'GET /credentials': { ok: true, hasCredentials: true, username: 'alice', file: 'x' } })
