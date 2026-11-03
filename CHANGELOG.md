@@ -20,6 +20,10 @@
 - **連續訊息合併** — `bridge.burstWindowSeconds`（預設 6 秒）：同一個人短時間內連傳幾條，
   會先按住，等窗口靜止再一次過理解、只回一次。每條之間會保留換行；`burstMaxWaitSeconds`
   防止有人不停打字時無限延遲。0 = 關閉。
+- **Reels 真的可以傳** — `reels.pool`（設定頁「Reels 清單」，一行一條）：`reel_share` 省略 permalink
+  時由清單隨機揀一條；冇清單就明確叫主人加，而唔係講「我傳唔到嘢」。
+- **unofficial 讀 reel** — sidecar `GET /media?mediaId=`（`media_info`）→ `transport.mediaInfo()`；
+  `reels.watch` 在沒有 Graph token 時走這條路，終於拿到 caption／類型／封面，唔再一定「睇唔到」。
 - **分段回覆寫入提示** — 明確告訴模型：可以分 2–3 條短訊息回（系統會自動拉開間隔），
   但連續訊息要當一段理解，不要逐條答。
 - **隨機回覆延遲** — `bridge.replyDelaySeconds {min,max}`（預設 2–12 秒），收到訊息後先等一段隨機時間才開始想回覆；

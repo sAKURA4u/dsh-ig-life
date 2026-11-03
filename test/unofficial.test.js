@@ -301,6 +301,16 @@ test('replying to a comment without a media id is refused with the reason', asyn
   )
 })
 
+test('media info is read from the sidecar, not the Graph API', async () => {
+  const fetchImpl = fakeFetch({
+    'GET /media': { ok: true, media: { id: '123', code: 'R1', caption: '夜', type: 2, thumbnailUrl: 'https://x.test/c.jpg', likeCount: 3 } },
+  })
+  const { transport } = await harness({ fetchImpl })
+  const info = await transport.mediaInfo('123')
+  assert.equal(info.caption, '夜')
+  assert.equal(info.code, 'R1')
+})
+
 // --------------------------------------------------------------------- story
 test('a story is posted with the local image path and recorded', async () => {
   const fetchImpl = fakeFetch({ 'POST /story': { ok: true, mediaId: 's1', permalink: 'https://www.instagram.com/p/s1/' } })

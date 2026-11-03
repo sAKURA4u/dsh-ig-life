@@ -43,6 +43,7 @@ import traceback
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8737
@@ -1042,6 +1043,27 @@ class Bridge:
                 self.ensure_client()
             return self.health()
 
+    def media(self, media_id: str) -> dict:
+        """Metadata for one post/reel, for actual caption/type/cover."""
+        with self._api_lock:
+            client = self.ensure_client()
+            try:
+                info = client.media_info(str(media_id))
+            except Exception as error:
+                raise _map_exception(error)
+        media_type = int(_get(info, "media_type", 0) or 0)
+        return {
+            "ok": True,
+            "media": {
+                "id": str(_get(info, "pk", "") or media_id),
+                "code": str(_get(info, "code", "") or ""),
+                "caption": str(_get(info, "caption_text", "") or ""),
+                "type": media_type,
+                "thumbnailUrl": str(_get(info, "thumbnail_url", "") or ""),
+                "likeCount": int(_get(info, "like_count", 0) or 0),
+            },
+        }
+
     # ---- health -----------------------------------------------------------
     def health(self) -> dict:
         # `_api_lock` first, then `_roll_day()` takes `_lock`: the same order as
@@ -1150,6 +1172,13 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if method == "POST" and route == "/send_media":
                 self._send_json(200, bridge.send_media(self._read_body()))
+                return
+            if method == "GET" and route == "/media":
+                query = parse_qs(urlparse(self.path).query)
+                media_id = (query.get("mediaId") or [""])[0].strip()
+                if not media_id:
+                    raise BridgeError("IG_NO_MEDIA_ID", "mediaId 不能空白", "帶 ?mediaId=...", 400)
+                self._send_json(200, bridge.media(media_id))
                 return
             if method == "POST" and route == "/story":
                 self._send_json(200, bridge.story(self._read_body()))

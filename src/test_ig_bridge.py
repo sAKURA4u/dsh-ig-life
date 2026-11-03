@@ -82,6 +82,16 @@ class FakeClient:
     def photo_upload(self, path, caption):
         return SimpleNamespace(pk="999", code="ABC123")
 
+    def media_info(self, media_id):
+        return SimpleNamespace(
+            pk=int(media_id or 0),
+            code="Reel123",
+            caption_text="夜晚的街",
+            media_type=2,
+            thumbnail_url="https://example.test/c.jpg",
+            like_count=7,
+        )
+
     def photo_upload_to_story(self, path, caption=""):
         self.last_story = (path, caption)
         return SimpleNamespace(pk="111", code="STORY1")
@@ -422,6 +432,18 @@ class SidecarTest(unittest.TestCase):
         status, payload = self.request("POST", "/profile", {"biography": "x" * 151})
         self.assertEqual(status, 400)
         self.assertEqual(payload["code"], "IG_BIO_TOO_LONG")
+
+    def test_media_metadata_is_returned(self):
+        status, payload = self.request("GET", "/media?mediaId=123")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["media"]["code"], "Reel123")
+        self.assertEqual(payload["media"]["caption"], "夜晚的街")
+        self.assertEqual(payload["media"]["type"], 2)
+
+    def test_media_requires_an_id(self):
+        status, payload = self.request("GET", "/media")
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["code"], "IG_NO_MEDIA_ID")
 
     # ---- misc
     def test_unknown_route_is_a_404_with_a_code(self):

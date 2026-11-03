@@ -149,3 +149,20 @@ test('the burst window is editable and clamped', () => {
   assert.equal(resolveConfig({ bridge: { burstWindowSeconds: 9999 } }).config.bridge.burstWindowSeconds, 120)
   assert.equal(resolveConfig({ bridge: { burstWindowSeconds: -1 } }).config.bridge.burstWindowSeconds, 0)
 })
+
+
+test('with no reel library it refuses and names the setting', async () => {
+  const { bridge } = await makeWorld()
+  const result = await bridge.shareReel({ threadId: 'reel-thread' })
+  assert.equal(result.ok, false)
+  assert.equal(result.code, 'IG_REEL_POOL_EMPTY')
+  assert.match(result.hint, /Reels/i)
+})
+
+test('a reel is picked from the library and actually sent', async () => {
+  const link = 'https://www.instagram.com/reel/AAA111/'
+  const { bridge } = await makeWorld({ configOverrides: { reels: { pool: [link] } } })
+  const result = await bridge.shareReel({ threadId: 'reel-thread' })
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.ok(String(result.text).includes(link))
+})
