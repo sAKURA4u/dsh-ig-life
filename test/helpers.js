@@ -34,7 +34,7 @@ export function makeConfig(overrides = {}) {
     allowlist: ['owner', 'friend'],
     life: { timezone: 'UTC', quietHours: '', wakeHour: 0, sleepHour: 24, ...(overrides.life ?? {}) },
     // Tests must never sit through the human-looking reply pause.
-    bridge: { replyDelaySeconds: { min: 0, max: 0 }, ...(overrides.bridge ?? {}) },
+    bridge: { replyDelaySeconds: { min: 0, max: 0 }, burstWindowSeconds: 0, ...(overrides.bridge ?? {}) },
     limits: { ...(overrides.limits ?? {}) },
     memory: { ...(overrides.memory ?? {}) },
     ...Object.fromEntries(Object.entries(overrides).filter(([key]) => !['life', 'bridge', 'limits', 'memory'].includes(key))),
