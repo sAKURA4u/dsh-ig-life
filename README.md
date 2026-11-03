@@ -20,7 +20,10 @@
 
 <br />
 
-> **One minute, zero setup, no Instagram account, no API key:**
+> **One-minute demo**: no Instagram account, no API key — this only shows how it talks.
+> Sending and receiving real DMs needs **an Instagram professional account, a Meta app
+> long-lived token and a public HTTPS tunnel**; see [docs/IG-SETUP.md](docs/IG-SETUP.md).
+> You never hand over a password.
 >
 > ```bash
 > git clone https://github.com/sAKURA4u/dsh-ig-life && cd dsh-ig-life

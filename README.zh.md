@@ -20,7 +20,9 @@
 
 <br />
 
-> **一分鐘、零設定、不需要 IG 帳號、不需要 API key：**
+> **一分鐘示範**：不需要 IG 帳號、不需要 API key —— 這只示範它怎麼說話，不是正式使用。
+> 要真正收發私訊，需要 **一個 IG 專業帳號 + Meta App 的 long-lived token + 公開 HTTPS 隧道**，
+> 逐步指示見 [docs/IG-SETUP.md](docs/IG-SETUP.md)。你不需要交出密碼。
 >
 > ```bash
 > git clone https://github.com/sAKURA4u/dsh-ig-life && cd dsh-ig-life
