@@ -6,6 +6,15 @@
 
 ## [0.4.0] — 未發佈
 
+### 修正
+
+- **整個插件 mount 回滾（設定頁 404 的真正原因）** — `ctx.interval` 在 `inject` 沒有
+  `timer` 時會拋 `cannot get property "timer" without inject`，而只要 `life.enabled: true`
+  就會踩到。插件一 rollback，所有路由（連 console API）都消失，只剩靜態 client bundle，
+  畫面就變成「HTTP 404」或空白。現在 `inject = ['timer']`，而且 tick 外層有 try/catch，
+  timer 真的缺席時只會 warning，不會再拖死整個插件。
+
+
 ### 新增
 
 - **連續訊息合併** — `bridge.burstWindowSeconds`（預設 6 秒）：同一個人短時間內連傳幾條，
@@ -106,8 +115,6 @@
 - 私有協議隨時會改。Instagram 一改簽名，登入就會壞，要等 instagrapi 更新 —— **壞了不保證修好**。
 - **密碼登入已被 IG 封**：Instagram 不再提供 `ig-set-password-encryption-key-id`，instagrapi
   的 `password_publickeys()` 會 `int(None)`。請用 **sessionid** 登入（設定頁有欄位）。
-- **GUI 設定頁可能在部分環境空白**（section 註冊到但 component 不 render；診斷中）。
-  設定仍可用 `~/.dsh/ig-life/settings.json` 或 `/ig-life/console`。
 - 非官方帳號會封。用一個可以犧牲的小號，先 dryrun 觀察一個星期。
 
 ---
