@@ -77,6 +77,18 @@ DSH → 設定 → **Instagram 人生** → 帳號：填小號 username 同密�
 插件唔會存、唔會 log、唔會回傳密碼，存檔後欄位即清空。之後每次啟動都會重用 session，
 唔需要再登入（session 真係失效才用密碼重登，並受 10 分鐘退避保護）。
 
+**方法 C：sessionid（目前最可靠）**
+
+Instagram 已經停止提供密碼加密金鑰（`ig-set-password-encryption-key-id`），
+instagrapi 的 `password_publickeys()` 會 `int(None)` 爆掉 —— 2.x 同 3.x 都一樣。
+繞過整條密碼流程的方法是用瀏覽器的登入狀態：
+
+1. 用**電腦瀏覽器**登入 instagram.com（同一個小號）。
+2. F12 → Application → Cookies → `https://www.instagram.com` → 複製 `sessionid`。
+3. 設定頁「帳號」→ 貼去 **sessionid** 欄 → 儲存並登入。
+
+sessionid 等於登入狀態，同密碼一樣只寫入 sidecar 的 0600 檔案；過期（登出、改密碼、
+IG 主動踢）就重新複製一次。**唔好**貼去任何對話或 issue。
 **方法 B：命令列**
 
 ```bash

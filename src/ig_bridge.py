@@ -82,6 +82,18 @@ def _map_exception(error: Exception) -> "BridgeError":
         return error
     name = type(error).__name__
     message = str(error) or name
+    stack = traceback.format_exc()
+    if name == "TypeError" and "int()" in message and "password_publickeys" in stack:
+        # Instagram stopped serving the password-encryption key headers that
+        # instagrapi reads in password_publickeys(); every password login now
+        # dies there. The sessionid path does not need them.
+        return BridgeError(
+            "IG_PASSWORD_FLOW_BROKEN",
+            "Instagram 已經唔再提供密碼加密金鑰，所以密碼登入暫時行唔通",
+            "改用 sessionid 登入：電腦瀏覽器登入 instagram.com → F12 → Application → "
+            "Cookies → https://www.instagram.com → 複製 sessionid，貼去設定頁的「sessionid」欄，再按儲存並登入",
+            502,
+        )
     if name in ("ChallengeRequired", "ChallengeError", "ChallengeUnknownStep"):
         return BridgeError(
             "IG_CHALLENGE_REQUIRED",
@@ -140,7 +152,6 @@ def _map_exception(error: Exception) -> "BridgeError":
         )
     # An unexpected internal failure (e.g. instagrapi calling int(None)) is
     # undiagnosable without the stack, so keep it and name the last frame.
-    stack = traceback.format_exc()
     frame = _last_frame(stack)
     log.warning("instagrapi 未預期失敗（%s）：%s\n%s", name, message, stack)
     return BridgeError(
@@ -503,19 +514,22 @@ class Bridge:
         data = load_json(secret_file, {}) or {}
         username = str(data.get("username") or os.environ.get("IG_USERNAME") or "").strip().lstrip("@")
         password = str(data.get("password") or os.environ.get("IG_PASSWORD") or "")
-        if not username or not password:
+        sessionid = str(data.get("sessionid") or os.environ.get("IG_SESSIONID") or "").strip()
+        if not (password or sessionid):
             raise BridgeError(
                 "IG_NO_CREDENTIALS",
-                "未找到 IG 帳號密碼",
-                f'跑 python src/ig_bridge.py --set-credentials（互動輸入，不會回顯）；或手動寫入 {secret_file} 並設為 0600',
+                "未找到 IG 密碼或 sessionid",
+                "在設定頁填帳密或 sessionid；或者跑 python src/ig_bridge.py --set-credentials",
                 503,
             )
+        if not username and not sessionid:
+            raise BridgeError("IG_NO_CREDENTIALS", "未找到 IG 使用者名稱", "填小號 username", 503)
         try:
             if secret_file.exists() and (secret_file.stat().st_mode & 0o077):
                 log.warning("ig-secrets.json 權限太寬（%o）—— 建議 chmod 600", secret_file.stat().st_mode & 0o777)
         except OSError:
             pass
-        return username, password
+        return username, password, sessionid
 
     def _session_meta(self) -> dict:
         return load_json(self.data_dir / "ig-session-meta.json", {}) or {}
@@ -543,7 +557,7 @@ class Bridge:
 
     def _login(self, force_relogin: bool = False):
         ig = _instagrapi()
-        username, password = self._credentials()
+        username, password, sessionid = self._credentials()
         session_file = self.data_dir / "ig-session.json"
         meta = self._session_meta()
         fresh_at = float(meta.get("freshLoginAt") or 0)
@@ -570,16 +584,27 @@ class Bridge:
                     pass
             return client
 
+        def reuse_session(client):
+            """Validate a loaded session without ever touching the password.
+
+            `login()` would fall back to password encryption when the session is
+            stale, and Instagram no longer serves the key it needs (see
+            password_publickeys). Validating the sessionid directly keeps a
+            working session working and fails cleanly when it is gone.
+            """
+            sid = getattr(client, "sessionid", None)
+            if not sid:
+                raise BridgeError("IG_LOGIN_REQUIRED", "session 檔裡面沒有 sessionid", "", 401)
+            client.login_by_sessionid(sid)
+            if not getattr(client, "user_id", None):
+                raise BridgeError("IG_LOGIN_REQUIRED", "session 重用之後仍未登入", "", 401)
+
         resumed = False
         if session_file.exists() and not force_relogin:
             client = make_client()
             try:
                 client.load_settings(str(session_file))
-                # `login()` after `load_settings()` reuses the sessionid cookie.
-                # It does not open a new login request, which is the whole point.
-                client.login(username, password)
-                if not getattr(client, "user_id", None):
-                    raise BridgeError("IG_LOGIN_REQUIRED", "session 重用之後仍未登入", "", 401)
+                reuse_session(client)
                 resumed = True
             except Exception as error:
                 mapped = _map_exception(error)
@@ -588,7 +613,7 @@ class Bridge:
                     raise mapped
                 resumed = False
         if resumed:
-            self._remember(client, username, "reused")
+            self._remember(client, str(getattr(client, "username", "") or username), "reused")
             self._refresh_session_file(client)
             return client
 
@@ -603,10 +628,13 @@ class Bridge:
 
         client = make_client()
         try:
-            client.login(username, password)
+            if sessionid:
+                client.login_by_sessionid(sessionid)
+            else:
+                client.login(username, password)
         except Exception as error:
             raise _map_exception(error)
-        self._remember(client, username, "fresh")
+        self._remember(client, str(getattr(client, "username", "") or username or "ig"), "fresh")
         self._refresh_session_file(client)
         return client
 
@@ -902,16 +930,19 @@ class Bridge:
     # ---- credentials (the settings page's account section) ---------------
     def credentials_payload(self) -> dict:
         """
-        What the page may know: whether a password is set, and the username.
-        The password itself never leaves this process — not masked, not at all.
+        What the page may know: whether a password or sessionid is set, and the
+        username. Neither secret ever leaves this process — not masked, not at all.
         """
         secret_file = self.data_dir / "ig-secrets.json"
         data = load_json(secret_file, {}) or {}
         username = str(data.get("username") or os.environ.get("IG_USERNAME") or "").strip().lstrip("@")
         has_password = bool(str(data.get("password") or os.environ.get("IG_PASSWORD") or ""))
+        has_sessionid = bool(str(data.get("sessionid") or os.environ.get("IG_SESSIONID") or ""))
         return {
             "ok": True,
-            "hasCredentials": bool(username and has_password),
+            "hasCredentials": bool((username or has_sessionid) and (has_password or has_sessionid)),
+            "hasPassword": has_password,
+            "hasSessionid": has_sessionid,
             "username": username or None,
             "file": str(secret_file),
         }
@@ -919,25 +950,46 @@ class Bridge:
     def save_credentials(self, payload: dict) -> dict:
         username = str(payload.get("username") or "").strip().lstrip("@")
         password = str(payload.get("password") or "")
-        if not username:
-            raise BridgeError("IG_NO_CREDENTIALS", "username 不能空白", "填小號的 IG 使用者名稱（不用 @）", 400)
+        sessionid = str(payload.get("sessionid") or "").strip()
+        existing = load_json(self.data_dir / "ig-secrets.json", {}) or {}
+        # A blank field on a later save means "keep the stored one".
         if not password:
-            # Blank password on a later save means "keep the stored one".
-            existing = load_json(self.data_dir / "ig-secrets.json", {}) or {}
             password = str(existing.get("password") or "")
-            if not password:
-                raise BridgeError("IG_NO_CREDENTIALS", "password 不能空白", "第一次設定要輸入密碼；之後留空表示沿用舊密碼", 400)
-        secure_write(
-            self.data_dir / "ig-secrets.json",
-            json.dumps({"username": username, "password": password}, ensure_ascii=False, indent=2) + "\n",
-        )
+        if not sessionid:
+            sessionid = str(existing.get("sessionid") or "")
+        if not username and not sessionid:
+            raise BridgeError("IG_NO_CREDENTIALS", "username 不能空白", "填小號的 IG 使用者名稱（不用 @），或者直接給 sessionid", 400)
+        if not password and not sessionid:
+            raise BridgeError(
+                "IG_NO_CREDENTIALS",
+                "password 同 sessionid 都是空白",
+                "第一次設定要其中一個；如果密碼登入行唔通，貼 sessionid",
+                400,
+            )
+        stored = {"username": username}
+        if password:
+            stored["password"] = password
+        if sessionid:
+            stored["sessionid"] = sessionid
+        secure_write(self.data_dir / "ig-secrets.json", json.dumps(stored, ensure_ascii=False, indent=2) + "\n")
         with self._api_lock:
             # A different account means the old client belongs to somebody else.
-            if self._username and self._username.lower() != username.lower():
+            if self._username and self._username.lower() != username.lower() and username:
                 self._client = None
                 self._session_note = "unknown"
-        log.info("credentials saved for @%s（密碼不會寫入 log）", username)
-        return {"ok": True, "username": username, "hasCredentials": True}
+        log.info(
+            "credentials saved for @%s（password=%s sessionid=%s；值不會寫入 log）",
+            username or "?",
+            "set" if password else "none",
+            "set" if sessionid else "none",
+        )
+        return {
+            "ok": True,
+            "username": username or None,
+            "hasCredentials": True,
+            "hasPassword": bool(password),
+            "hasSessionid": bool(sessionid),
+        }
 
     def login(self) -> dict:
         """Log in now if we are not already logged in. Reuses the session first."""

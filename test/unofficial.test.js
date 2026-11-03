@@ -308,7 +308,9 @@ test('credentials are read without ever carrying the password', async () => {
   const account = await transport.credentials()
   assert.equal(account.username, 'alice')
   assert.equal(account.hasCredentials, true)
-  assert.ok(!JSON.stringify(account).toLowerCase().includes('password'))
+  assert.equal(account.hasPassword, false)
+  assert.equal(account.hasSessionid, false)
+  assert.ok(!JSON.stringify(account).includes('s3cret'))
 })
 
 test('saving credentials posts them once and leaves no trace in the outbox', async () => {
@@ -330,6 +332,14 @@ test('login asks the sidecar and reports the session it got', async () => {
   assert.equal(result.session, 'reused')
 })
 
+test('a sessionid can be saved instead of a password', async () => {
+  const sid = '9'.repeat(40)
+  const fetchImpl = fakeFetch({ 'POST /credentials': { ok: true, username: 'alice', hasSessionid: true } })
+  const { transport } = await harness({ fetchImpl })
+  const result = await transport.saveCredentials({ username: '', sessionid: sid })
+  assert.equal(fetchImpl.last().body.sessionid, sid)
+  assert.equal(result.hasSessionid, true)
+})
 test('an empty username never reaches the sidecar', async () => {
   const fetchImpl = fakeFetch({})
   const { transport } = await harness({ fetchImpl })

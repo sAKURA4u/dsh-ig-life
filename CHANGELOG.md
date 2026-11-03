@@ -52,6 +52,10 @@
   `src/ig_bridge.py --serve --data-dir <dataDir>`，已有人在跑就直接接管；列出 Python／依賴狀態，
   設定頁有「啟動／重新啟動／檢查依賴」。裝好之後唔需要再開終端。子進程只讀同一個 dataDir
   （包括 `sidecar-token`），所以自訂 dataDir 都唔會撞 401。
+- **sessionid 登入** — IG 已經唔再提供密碼加密金鑰（`password_publickeys()` 會 `int(None)`），
+  密碼登入實質被封。sidecar 支援 `{"sessionid": "..."}`（同 `login_by_sessionid()`），
+  設定頁加「sessionid」欄；session 重用改用 `login_by_sessionid` 驗證，唔會再誤入密碼流程。
+  `instagrapi` 升級到 `>=3.2,<4`。
 - **「安裝依賴」按鈕** — 設定頁一按就跑 `python -m pip install -r src/requirements.txt`（非阻塞、
   5 分鐘上限、輸出回傳）；只有用戶明確按下去才會裝東西。對外派發時，對方只剩「裝 Python」
   同「填帳號」兩件事。

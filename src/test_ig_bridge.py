@@ -245,6 +245,20 @@ class SidecarTest(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(payload["code"], "IG_NO_CREDENTIALS")
 
+    def test_a_sessionid_can_be_stored_without_a_password(self):
+        sid = "9" * 40
+        status, payload = self.request("POST", "/credentials", {"username": "n0rma", "sessionid": sid})
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["hasSessionid"])
+        self.assertNotIn(sid, json.dumps(payload), "the sessionid must never cross the wire")
+
+        status, payload = self.request("GET", "/credentials")
+        self.assertTrue(payload["hasCredentials"])
+        self.assertTrue(payload["hasSessionid"])
+        self.assertFalse(payload["hasPassword"])
+        stored = json.loads((self.data_dir / "ig-secrets.json").read_text(encoding="utf-8-sig"))
+        self.assertEqual(stored["sessionid"], sid)
+
     def test_login_reports_an_already_connected_client(self):
         status, payload = self.request("POST", "/login")
         self.assertEqual(status, 200)
@@ -409,6 +423,62 @@ class LimitTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(prefix="ig-bridge-cap-")
         self.bridge = igb.Bridge(Path(self.tmp.name), send_per_day=2, post_per_day=1)
 
+    def test_the_broken_password_flow_is_named(self):
+        class PasswordMixin:
+            def password_publickeys(self):
+                raise TypeError("int() argument must be a string, a bytes-like object or a real number, not 'NoneType'")
+
+        try:
+            PasswordMixin().password_publickeys()
+        except TypeError as error:
+            mapped = igb._map_exception(error)
+        self.assertEqual(mapped.code, "IG_PASSWORD_FLOW_BROKEN")
+        self.assertIn("sessionid", mapped.hint)
+
+    def test_sessionid_alone_logs_in_without_the_password_flow(self):
+        data_dir = Path(self.tmp.name) / "sid-bridge"
+        data_dir.mkdir()
+        sid = "9" * 40
+        igb.secure_write(data_dir / "ig-secrets.json", json.dumps({"username": "n0rma", "sessionid": sid}))
+        calls = []
+
+        class FakeClient:
+            def __init__(self):
+                self.sessionid = None
+                self.user_id = None
+                self.username = None
+                self.calls = calls
+
+            def set_country(self, *_args):
+                pass
+
+            def set_country_code(self, *_args):
+                pass
+
+            def set_locale(self, *_args):
+                pass
+
+            def login_by_sessionid(self, value):
+                calls.append(("sid", value))
+                self.sessionid = value
+                self.user_id = 42
+                self.username = "n0rma"
+
+            def login(self, username, password):
+                calls.append(("password", username, password))
+
+            def get_settings(self):
+                return {"cookies": {}}
+
+        original = igb._instagrapi
+        igb._instagrapi = lambda: SimpleNamespace(Client=FakeClient)
+        try:
+            bridge = igb.Bridge(data_dir)
+            client = bridge.ensure_client()
+        finally:
+            igb._instagrapi = original
+        self.assertEqual(client.username, "n0rma")
+        self.assertEqual(calls, [("sid", sid)], "the password flow must not run when a sessionid exists")
     def test_the_serve_flag_is_accepted(self):
         # The plugin's supervisor spawns `--serve`; argparse must not reject it.
         args = igb.build_parser().parse_args(["--serve", "--port", "9000"])

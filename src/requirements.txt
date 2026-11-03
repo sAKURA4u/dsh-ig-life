@@ -6,6 +6,9 @@
 #
 #   python -m pip install -r src/requirements.txt
 #
-# Pinned to the 2.x line on purpose — a major bump may change the private API
-# support in ways this sidecar has not been tested against.
-instagrapi>=2.1.2,<3
+# 3.x is required. Instagram stopped sending the password-encryption key
+# headers that 2.x reads in password_publickeys(), so password login dies on
+# int(None) there; 3.x has the same call but at least ships with current API
+# fixes. The sessionid login (recommended, and the settings page supports it)
+# avoids that flow entirely.
+instagrapi>=3.2,<4
