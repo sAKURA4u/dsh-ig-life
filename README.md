@@ -170,6 +170,7 @@ The owner can also send `/pause` `/resume` `/sleep` `/status` `/slang` `/people`
 | [docs/MEMORY.md](docs/MEMORY.md) | the four tiers, retrieval scoring, sleep compression, tuning |
 | [docs/IG-SETUP.md](docs/IG-SETUP.md) | Meta app, webhook, voice/sticker/reel setup, the full error-code table |
 | [docs/PRIVACY.md](docs/PRIVACY.md) | what is stored, what never leaves, anti-ban mechanics, risk register |
+| [CHANGELOG.md](CHANGELOG.md) | what changed in each version, and why |
 
 ## ✅ Verify
 

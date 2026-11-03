@@ -168,6 +168,7 @@ seed.json       出世時就帶著的記憶（第一人稱）
 | [docs/MEMORY.md](docs/MEMORY.md) | 四層記憶、檢索評分、睡眠壓縮、調參建議 |
 | [docs/IG-SETUP.md](docs/IG-SETUP.md) | Meta App、webhook、語音／表情包／Reels 設定、完整錯誤碼表 |
 | [docs/PRIVACY.md](docs/PRIVACY.md) | 存什麼、不存什麼、防封號機制、風險台賬 |
+| [CHANGELOG.md](CHANGELOG.md) | 更新日記：每一版改了什麼、為什麼 |
 
 ## ✅ 驗證
 
