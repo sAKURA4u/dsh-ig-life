@@ -208,12 +208,16 @@ Creator／Business，所以「像 QQ 那樣用普通帳號」只有私有 API �
    插件唔存、唔 log、唔回傳，頁面存檔後清空欄位；`GET /credentials` 只回 `hasCredentials` + username。
    呢個係刻意接受的取捨：DSH 的頁面同 sidecar 之間冇其他安全通道，而 loopback + token + 同源
    檢查已是能拿到的全部。**唔好**把這段改成「插件自己存一份」。
-5. **`POST /login` 才會登入**：sidecar 平常仍是 lazy（第一次 poll 才 `ensure_client`）。按鈕叫它
+5. **帳號客戶端獨立於現行 transport**：人係「先填帳密、再轉 unofficial」，而 dryrun 的 transport
+   根本冇帳號概念。所以 index.js 傳一個 lazy `getAccount()`：現行 transport 有就用，冇就即場建
+   一個 unofficial HTTP client。頁面會顯示 `configuredTransport`，未轉就出提示＋「改用 unofficial」
+   一鍵按鈕。**唔好**把帳號路由改回綁死 `transport` —— 那正是 `IG_TRANSPORT_NO_ACCOUNT` 的成因。
+6. **`POST /login` 才會登入**：sidecar 平常仍是 lazy（第一次 poll 才 `ensure_client`）。按鈕叫它
    即刻試，session 優先；重新登入受 10 分鐘退避保護。存好之後，之後每次啟動都自動重用 session。
-6. **同源檢查**：所有改狀態的 POST 要 `Origin`／`Sec-Fetch-Site` 同源 —— loopback 本身唔夠，
+7. **同源檢查**：所有改狀態的 POST 要 `Origin`／`Sec-Fetch-Site` 同源 —— loopback 本身唔夠，
    本機任何程式都連得到 127.0.0.1。
-7. **client bundle 包 error boundary**：註冊或 render 失敗只影響這一頁，不會拖死設定面板。
-8. **console 唔再依附 webhook**：`/ig-life/console`、`/ig-life/media` 只要有 webServer 就掛。
+8. **client bundle 包 error boundary**：註冊或 render 失敗只影響這一頁，不會拖死設定面板。
+9. **console 唔再依附 webhook**：`/ig-life/console`、`/ig-life/media` 只要有 webServer 就掛。
 
 ### 已驗證（用 app 自己的 0.2.1 runtime，隔離 DSH_HOME 預檢）
 

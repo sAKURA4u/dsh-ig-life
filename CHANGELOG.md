@@ -39,6 +39,10 @@
   俾「儲存並登入」用（session 先，失效才用密碼），之後啟動自動重用 session。
 - **同源檢查** — 所有會改狀態的 POST 都要求 `Origin`／`Sec-Fetch-Site` 同源，單靠 loopback
   唔夠（本機任何程式都連得到 127.0.0.1，瀏覽器又可能被其他網站驅動）。
+- **帳密可以先填、後轉 transport** — 設定頁用一個獨立的 sidecar 客戶端（唔借現行的
+  transport），所以 `transport: dryrun` 都存得到帳密；頁面會提示「目前係 dryrun，要改為
+  unofficial 才會用」，並有一個「改用 unofficial」按鈕一鍵改＋存。之前會回
+  `IG_TRANSPORT_NO_ACCOUNT`，因為 dryrun 的 transport 根本冇帳號概念。
 - **設定層三層合併** — 預設值 → Cordis row（部署）→ `<dataDir>/settings.json`（使用者），
   同 DSH 自己的設定模型一致；`lib/settings.js` 負責驗證與最小寫入（只寫使用者改過的 path，
   不會把今日的預設值烙進檔案）。

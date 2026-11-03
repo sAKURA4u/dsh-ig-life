@@ -99,7 +99,7 @@ test('the editable projection carries no secret-bearing key', () => {
 })
 
 // ------------------------------------------------------------------ console API
-function fakeConsole(dir, transportOverrides = null, routePath = '/ig-life/console/api/settings') {
+function fakeConsole(dir, transportOverrides = null, routePath = '/ig-life/console/api/settings', getAccount = null) {
   const routes = createConsole({
     bridge: { status: () => ({}), recentInbox: () => [] },
     life: null,
@@ -112,6 +112,7 @@ function fakeConsole(dir, transportOverrides = null, routePath = '/ig-life/conso
     config: { ...resolveConfig({ transport: 'dryrun' }).config },
     dataDir: dir,
     logger: () => {},
+    getAccount,
   })
   const route = routes.find((entry) => entry.path === routePath)
   assert.ok(route, `the ${routePath} route exists`)
@@ -275,6 +276,32 @@ test('a cross-origin POST cannot change the account', async () => {
   assert.equal(called, false)
 })
 
+
+test('the account works before the transport is switched to unofficial', async () => {
+  const calls = []
+  const handler = fakeConsole(
+    dataDir(),
+    null,
+    '/ig-life/console/api/account',
+    async () => ({
+      credentials: async () => ({ ok: true, hasCredentials: false, username: null }),
+      saveCredentials: async ({ username, password }) => {
+        calls.push({ username, password })
+        return { ok: true, username, hasCredentials: true }
+      },
+      health: async () => ({ ok: false, loggedIn: false, code: 'IG_SIDECAR_DOWN' }),
+      login: async () => ({ ok: false, loggedIn: false }),
+    }),
+  )
+  const res = fakeRes()
+  await handler(
+    { method: 'POST', socket: { remoteAddress: '127.0.0.1' }, headers: {}, body: Buffer.from(JSON.stringify({ username: 'n0rma', password: 'pw' })) },
+    res,
+  )
+  assert.equal(res.statusCode, 200, 'a dryrun deployment must still be able to store the account')
+  assert.deepEqual(calls, [{ username: 'n0rma', password: 'pw' }])
+  assert.equal(JSON.parse(res.body).configuredTransport, 'dryrun')
+})
 
 // ------------------------------------------------------- browser client bundle
 test('the hand-written client bundle registers a settings section', () => {
