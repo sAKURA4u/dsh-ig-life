@@ -106,7 +106,9 @@ test('two quick messages are understood as one turn, not two', async () => {
 
   await bridge.ingest([dmEvent({ externalId: 'burst-1', text: 'hi' })])
   await bridge.ingest([dmEvent({ externalId: 'burst-2', text: '你能 send reels 嗎' })])
-  await new Promise((resolve) => setTimeout(resolve, 150))
+  assert.equal(seen.length, 0, 'the window holds the burst')
+  // Flush deterministically: a wall-clock wait here is what made CI flaky.
+  await bridge.flushPending()
 
   assert.equal(seen.length, 1, 'one turn for a burst')
   assert.equal(seen[0].text, 'hi\n你能 send reels 嗎')
