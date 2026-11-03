@@ -1,0 +1,3 @@
+﻿# Python bytecode leaves nothing to ship; the sidecar is source-only.
+__pycache__/
+*.pyc
