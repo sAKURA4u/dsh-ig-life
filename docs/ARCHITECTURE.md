@@ -82,8 +82,11 @@ DSH 0.2 之後 `ctx.agents` / `ctx.llm` / `ctx.storage` / `ctx.webServer` / `ctx
 
 | 檔案 | 職責 |
 |---|---|
-| `lib/index.js` | `apply()`：接線、掛 webhook / tick、回傳除錯 handle |
-| `lib/config.js` | 零依賴的預設值 + 驗證 + 環境變數覆寫 |
+| `lib/index.js` | `apply()`：接線、掛 webhook / console / poll / tick、回傳除錯 handle |
+| `lib/config.js` | 零依賴的預設值 + 驗證 + 環境變數覆寫 + 三層合併 |
+| `lib/settings.js` | 使用者設定層：白名單欄位、驗證、最小寫入 `<dataDir>/settings.json` |
+| `lib/client.js` | 瀏覽器那一半：手寫 DSH client bundle，登記 `settings.section`「Instagram 人生」 |
+| `lib/console.js` | 控制台頁 + 設定 REST（`/ig-life/console/api/settings`） |
 | `lib/gate.js` | 純函式安全閥：白名單、靜音時段、額度、脫敏、主人指令 |
 | `lib/memory.js` | 純函式記憶模型：分層、清晰度衰減、檢索評分、壓縮 |
 | `lib/book.js` | 記憶的持久化 + 播種 + 每晚壓縮 |
@@ -144,7 +147,7 @@ tick（預設 300 秒）
 ## 驗證
 
 ```bash
-npm test                       # 186 個測試，零依賴、零網絡
+npm test                       # 199 個測試，零依賴、零網絡
 python src/test_ig_bridge.py   # sidecar 的測試（34 個，只用標準庫）
 node scripts/self-check.mjs    # 端到端示範（dryrun + 假大腦）
 node scripts/link-dsh.mjs      # 把本機 DSH 套件 link 進來，讓工具註冊走真 defineTool

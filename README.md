@@ -107,6 +107,15 @@ Read it for a week. Only then switch to a real body.
 its logs or a prompt — and the sidecar is the thing that decides how fast Instagram is
 touched. [The full warning and setup →](docs/UNOFFICIAL.md)
 
+### ⚙️ Settings, in the GUI
+
+The plugin contributes its own page to **DSH → Settings → Instagram 人生**: transport,
+owner handle, allowlist, the daily rhythm, the caps and the sidecar address. Saving writes
+`<dataDir>/settings.json` (only those fields — never a token) and the page says plainly that
+a restart applies it. The same data is editable from `/ig-life/console` if the page is not
+mounted (a bundle that fails to register leaves the rest of Settings alone: the page is
+wrapped in its own error boundary).
+
 <details>
 <summary><b>📝 Configuration (click)</b></summary>
 
@@ -200,7 +209,7 @@ The owner can also send `/pause` `/resume` `/sleep` `/status` `/slang` `/people`
 ## ✅ Verify
 
 ```bash
-node scripts/test.mjs          # 186 tests, 0 failures, no dependencies, no network
+node scripts/test.mjs          # 199 tests, 0 failures, no dependencies, no network
 node scripts/self-check.mjs    # end-to-end dry run with a scripted brain
 node scripts/loader-smoke.mjs  # boots under the real Cordis runtime
 python src/test_ig_bridge.py   # the unofficial sidecar: stdlib only, no instagrapi needed

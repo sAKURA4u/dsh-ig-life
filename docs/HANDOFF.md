@@ -4,9 +4,10 @@
 
 ---
 
-## 1. 桌面 app 掛載問題（已找到根因）
+## 1. 桌面 app 掛載問題（已解決）
 
-DSH 桌面 app（`0.2.1-rc.5`，`resources/app.asar`）**不會掛載本插件**；`node scripts`／`dsh web`（npm 版 `0.1.1-rc.2`，profile `web`）則正常。
+DSH 桌面 app（`0.2.1-rc.5`，`resources/app.asar`）曾經**不會掛載本插件**；2026-11-03 23:22
+已喺 app 內成功掛載（`tools registered: 21 (ok)`）。根因同出口如下。
 
 ### 根因：DSH 0.2 的插件相容性閘（不是 loader、不是 path、不是 row）
 
@@ -181,9 +182,49 @@ Creator／Business，所以「像 QQ 那樣用普通帳號」只有私有 API �
 
 ---
 
-## 3. 現況基線
+## 3. GUI 設定頁（已完成）
 
-- **186 個 JS 測試** + **34 個 Python sidecar 測試**，全綠
+**DSH → 設定 → Instagram 人生** 一頁，改完存檔、重啟生效。
+
+| 檔案 | 職責 |
+|---|---|
+| `lib/settings.js` | 三層合併的第三層：白名單欄位、`resolveConfig` 驗證、只寫使用者改過的 path |
+| `lib/client.js` | 手寫的 DSH client bundle（`window.__ModuleLoader__.load` + lazy CJS factory），無 build step |
+| `lib/console.js` | `/ig-life/console/api/settings`（GET 讀 effective + saved，POST 驗證並寫檔） |
+| `package.json` | `exports["./client"]` + `dsh.client.platform: "web"` |
+
+### 決定
+
+1. **唔用 DSH 的 `ctx.settings` namespace**。那要 schemastery schema + revision fencing，
+   而這裡要存的只是幾個已驗證的偏好；用檔案做使用者層，blast radius 限於「本插件重讀自己的
+   config」。日後若要 native 設定卡，再把 `settings.register` 接上而保留同一個檔案。
+2. **只寫使用者改過的 path**。第一版寫整個 projection，結果把今日的預設值烙進檔案、還把
+   上一次的 ownerHandle 蓋成 `''`（測試抓到）。現在 `providedPaths()` + `subsetOf()` 只留
+   提交過的葉節點。
+3. **永遠冇 secret**：`EDITABLE` 不含 token／密碼，`graph.accessToken` 寫入會被丟棄（有測試）。
+4. **client bundle 包 error boundary**：註冊或 render 失敗只影響這一頁，不會拖死設定面板。
+5. **console 唔再依附 webhook**：`/ig-life/console`、`/ig-life/media` 只要有 webServer 就掛。
+
+### 已驗證（用 app 自己的 0.2.1 runtime，隔離 DSH_HOME 預檢）
+
+```
+boot graph: …,dsh-ig-life/client.js,…
+GET  /ig-life/console/api/settings → {ok:true, effective:{transport:"dryrun",…}}
+POST → {ok:true, changed:["transport","ownerHandle","limits.dmPerDay"], restartRequired:true}
+重啟後 GET → effective.transport = "unofficial"、dmPerDay = 9   ← 使用者層真的生效
+```
+
+### 未做
+
+- 未在**真實 GUI** 內按過那一頁（預檢只證明 bundle 入 graph、API 通；React 渲染要人眼）。
+  如果頁面空白：DevTools（Ctrl+Shift+I）看 `[ig-life] settings section not registered`。
+- 設定頁只覆蓋常用欄位；Graph token／voice／stickers 仍在 YAML。
+
+---
+
+## 4. 現況基線
+
+- **199 個 JS 測試** + **34 個 Python sidecar 測試**，全綠
 - `node scripts/loader-smoke.mjs`（真 Cordis）全綠
 - CI：Node 20/22/24 × Ubuntu/Windows + 一個 `python sidecar` job（`py_compile` + stdlib 測試）
 - Release：`v0.3.0`；CHANGELOG 中英

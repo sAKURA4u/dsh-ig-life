@@ -28,6 +28,15 @@
   避免有人（或一個 bug）把整部機的檔案傳上去。
 - **`--set-credentials`** — 互動輸入小號帳密（不回顯、不進 shell 歷史），sidecar 以 0600 寫入；
   同時容忍 Windows PowerShell 寫出的 UTF-8 BOM（以前會令密碼檔「讀不到」而被隔離）。
+- **GUI 設定頁** — **DSH → 設定 → Instagram 人生**：身體、主人、白名單、生命節奏、額度、
+  sidecar 位址。存 `<dataDir>/settings.json`（只寫白名單欄位，永遠冇 token），重啟後生效。
+  客戶端 bundle（`lib/client.js`）是手寫的 lazy-CJS、沒有 build step；整頁包在自己的 error
+  boundary 裡，註冊或 render 失敗只影響這一頁。
+- **設定層三層合併** — 預設值 → Cordis row（部署）→ `<dataDir>/settings.json`（使用者），
+  同 DSH 自己的設定模型一致；`lib/settings.js` 負責驗證與最小寫入（只寫使用者改過的 path，
+  不會把今日的預設值烙進檔案）。
+- **console 唔再依附 webhook** — `/ig-life/console` 與 `/ig-life/media` 只要有 webServer 就掛，
+  即使 `webhook.enabled: false`；只有 Meta 的 webhook 路由跟嗰個開關走。
 - **`docs/UNOFFICIAL.md`** — 大字警告、五分鐘設定、HTTP 契約、錯誤碼表、撤退步驟。
 - **`src/test_ig_bridge.py`** — 34 個 sidecar 測試：訊息正規化、額度、媒體白名單、token、
   HTTP 契約、BOM 容忍。只用標準庫、用假 client，不需要 instagrapi、不碰網絡。
