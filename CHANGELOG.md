@@ -11,8 +11,8 @@
 - **整個插件 mount 回滾（設定頁 404 的真正原因）** — `ctx.interval` 在 `inject` 沒有
   `timer` 時會拋 `cannot get property "timer" without inject`，而只要 `life.enabled: true`
   就會踩到。插件一 rollback，所有路由（連 console API）都消失，只剩靜態 client bundle，
-  畫面就變成「HTTP 404」或空白。現在 `inject = ['timer']`，而且 tick 外層有 try/catch，
-  timer 真的缺席時只會 warning，不會再拖死整個插件。
+  畫面就變成「HTTP 404」或空白。現在改用免 inject 的 `ctx.get('timer')` 取 timer 服務，
+  而且 tick 外層有 try/catch：timer 真的缺席時只會 warning，不會再拖死整個插件。
 
 
 ### 新增
