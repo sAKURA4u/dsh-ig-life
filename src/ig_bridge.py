@@ -34,10 +34,12 @@ import json
 import logging
 import os
 import random
+import re
 import secrets
 import sys
 import threading
 import time
+import traceback
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -136,12 +138,31 @@ def _map_exception(error: Exception) -> "BridgeError":
             "非官方私有 API 隨時會改；如果每次都一樣，就是 instagrapi 要更新了",
             502,
         )
+    # An unexpected internal failure (e.g. instagrapi calling int(None)) is
+    # undiagnosable without the stack, so keep it and name the last frame.
+    stack = traceback.format_exc()
+    frame = _last_frame(stack)
+    log.warning("instagrapi 未預期失敗（%s）：%s\n%s", name, message, stack)
     return BridgeError(
         "IG_UNOFFICIAL_ERROR",
-        f"{name}: {message}",
-        "非官方私有 API 沒有保證；壞了要等 instagrapi 修。細節看 sidecar 的輸出",
+        f"{name}: {message}" + (f"（{frame}）" if frame else ""),
+        "非官方私有 API 沒有保證。完整的 traceback 在 <dataDir>/ig-bridge.log；"
+        "如果是 TypeError 或 AttributeError，多半是 instagrapi 對 IG 的回應少了欄位 —— "
+        "先在手機 app 登入一次確認冇驗證，再重試；仍然一樣就要更新 instagrapi。",
         502,
     )
+
+
+def _last_frame(stack: str) -> str:
+    """`File ".../auth.py", line 782, in login` → `auth.py:782 login`."""
+    try:
+        matches = list(re.finditer(r'File "([^"]+)", line (\d+), in (\w+)', stack))
+        if not matches:
+            return ""
+        match = matches[-1]
+        return f"{Path(match.group(1)).name}:{match.group(2)} {match.group(3)}"
+    except Exception:  # pragma: no cover - diagnostics only
+        return ""
 
 
 # ------------------------------------------------------------------------- helpers
@@ -539,6 +560,14 @@ class Bridge:
                 client.request_timeout = 30
             except Exception:  # pragma: no cover
                 pass
+            # Some instagrapi releases crash on `int(self.country_code)` when a
+            # device/settings layer left it None. Pin the values a US-locale
+            # client would use; the account's real locale comes from IG itself.
+            for setter, value in (("set_country", "US"), ("set_country_code", 1), ("set_locale", "en_US")):
+                try:
+                    getattr(client, setter)(value)
+                except Exception:  # pragma: no cover - version differences
+                    pass
             return client
 
         resumed = False
