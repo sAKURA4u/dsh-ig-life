@@ -4,21 +4,44 @@
 
 ---
 
-## 1. 桌面 app 掛載問題（未解）
+## 1. 桌面 app 掛載問題（已找到根因）
 
 DSH 桌面 app（`0.2.1-rc.5`，`resources/app.asar`）**不會掛載本插件**；`node scripts`／`dsh web`（npm 版 `0.1.1-rc.2`，profile `web`）則正常。
 
-### 已證明（用 app 內部的診斷探針實測）
+### 根因：DSH 0.2 的插件相容性閘（不是 loader、不是 path、不是 row）
 
-在 app 的 loader 內動態 `import()` 本插件並執行 `apply()`，**兩者都成功**：
+DSH 0.2 的啟動器（`@deepseek-ai/dsh-app-boot`）逐個 bundle 檢查相容性，**唔符就靜靜跳過**，
+只寫 `skipping profile bundle ...` 去 stderr —— Electron 冇 console，所以完全睇唔到。
+
+規則（`evaluatePluginCompatibility`）：
+
+- `package.json` 有 `engines.dsh` → 只睇它；
+- 否則，**每一個** `@deepseek-ai/dsh` / `@deepseek-ai/dsh-*` 的 peerDependency 都要 `semver.satisfies(runtimeVersion, range)`；
+- 注意 semver 的 prerelease 規則：`^0.1.1-rc.2` 只覆蓋 `0.1.1-rc.x` 同 `0.1.x` release，
+  **唔會**覆蓋 `0.2.1-rc.5`；而且 `>=0.1.1-rc.2 <0.3.0` 都唔會（prerelease 要同一 tuple 先算）。
+
+實測：
 
 ```
-E import OK, exports: apply,configSchema,inject,instance,mount,name
-E apply OK, returned undefined
+dsh-app-boot 0.2.1-rc.5（桌面 app）  vs ^0.1.1-rc.2 -> false   ← 被跳過
+dsh 0.1.1-rc.2（npm CLI）            vs ^0.1.1-rc.2 -> true    ← 掛得到
 ```
 
-同一個 patch 檔、同一種寫法，**探針插件**（`mini-probe`，同目錄結構）可以正常掛載並執行。
-所以：**模組與 `apply()` 都沒有問題，是 loader 對這個 row 的處理不同。**
+`mini-probe` 得、本插件唔得，差別就在這裡：探針冇宣告 `@deepseek-ai/dsh-*` peer。
+
+### 出口：精確版本豁免（官方機制）
+
+`<profile>/compatibility.json`，key 係 `name@version`，value 係精確 runtime 版本清單：
+
+```json
+{ "dsh-ig-life@0.3.0": ["0.2.1-rc.5"] }
+```
+
+已寫入 `~/.dsh/profiles/desktop/compatibility.json`。等價於 app 插件管理器／
+`dsh plugin allow-version` 的「接受風險」授權；**唔會**改 manifest，移除檔案即撤回。
+
+> 未做：把 `peerDependencies` 的範圍正式擴到 `0.2.x`。那等於宣稱已在 0.2 驗證過 ——
+> 應該先在 0.2.1-rc.5 真正跑通（tools 註冊、agent、webServer），再改 manifest 出 release。
 
 ### 已排除的假設（全部實測過，不要再試）
 
@@ -33,9 +56,22 @@ E apply OK, returned undefined
 | 7 | `package.json` exports 限制 | 加 `./*` 通配無效 |
 | 8 | 入口必須在套件根目錄 | 用 `entry.js` 再匯出無效 |
 
-### 下一步（唯一剩下的方向）
+（以上其實都唔係原因 —— 係 bundle 未載入，先行到假設 3 的一步。真正原因見上。）
 
-在 app 內按 `Ctrl+Shift+I` 開 DevTools，看 console 對 `ig-life` 這個 entry 的實際錯誤。那是唯一尚未取得的資訊。
+### 點樣確認掛載成功
+
+重啟 app 之後，`~/.dsh/ig-life/boot.log` 會多一段**完整** trace：
+
+```
+--- apply() enter (pid ...) ---
+persona + memory + capability layer ready
+bridge started, webhook enabled
+tools registered: 21 (ok)
+mounted ok
+```
+
+如果只有 `enter` + `mounted ok`（冇中間三行），代表 `enabled: false`（測試寫入的），唔算成功。
+再用 `http://127.0.0.1:<app port>/ig-life/console` 確認。
 
 > 注意：app 的 profile patch 會被它自己管理（開機重寫 `cordis.yml`），設定 `~/.dsh/profiles/desktop/cordis.patch.yml` 時務必先備份。
 
