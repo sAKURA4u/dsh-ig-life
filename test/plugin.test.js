@@ -35,10 +35,10 @@ const pluginIdentity = () => ({
   inject: [...inject],
 })
 
-test('the plugin advertises the loader name and injects only the timer', () => {
+test('the plugin advertises the loader name and injects nothing', () => {
   const identity = pluginIdentity()
   assert.equal(identity.name, 'ig-life')
-  assert.deepEqual(identity.inject, ['timer'])
+  assert.deepEqual(identity.inject, [], 'no injection may block activation')
 })
 
 test('apply mounts with nothing but a timer service', async () => {
