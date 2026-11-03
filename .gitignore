@@ -21,3 +21,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# generated status report
+report.html
