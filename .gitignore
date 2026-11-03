@@ -24,3 +24,8 @@ Thumbs.db
 
 # generated status report
 report.html
+
+# never commit a token
+gh-token.txt
+*.token
+.github-token
