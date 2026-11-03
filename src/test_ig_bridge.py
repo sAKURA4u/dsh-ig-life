@@ -409,6 +409,12 @@ class LimitTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(prefix="ig-bridge-cap-")
         self.bridge = igb.Bridge(Path(self.tmp.name), send_per_day=2, post_per_day=1)
 
+    def test_the_serve_flag_is_accepted(self):
+        # The plugin's supervisor spawns `--serve`; argparse must not reject it.
+        args = igb.build_parser().parse_args(["--serve", "--port", "9000"])
+        self.assertTrue(args.serve)
+        self.assertEqual(args.port, 9000)
+
     def tearDown(self):
         self.tmp.cleanup()
 

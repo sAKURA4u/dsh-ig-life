@@ -120,6 +120,18 @@ The plugin contributes its own page to **DSH → Settings → Instagram 人生**
   token) and the page says plainly that a restart applies it.
 - Every field carries a sentence explaining what it does and what it costs.
 
+### 📦 Handing it to someone else
+
+1. They install the plugin: `dsh plugin --profile web add <repo>` (or the desktop app's plugin manager).
+2. They install the Python dependency once — the only terminal step:
+   `python -m pip install -r src/requirements.txt`
+3. DSH → Settings → Instagram 人生: type the account, **Save and log in**, press **switch to unofficial**, restart.
+
+The plugin **starts and adopts the sidecar itself** (`unofficial.autoStart`), so nobody has to keep a
+terminal open; the page shows the Python/dependency status and offers start/restart. The declared
+compatibility range covers DSH 0.1.x and 0.2.x, so a fresh install no longer needs a hand-written
+`compatibility.json`.
+
 The same data is editable from `/ig-life/console` if the page is not mounted (a bundle that
 fails to register leaves the rest of Settings alone: the page is wrapped in its own error
 boundary).

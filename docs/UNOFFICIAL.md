@@ -124,7 +124,10 @@ python src/ig_bridge.py                     # 預設 127.0.0.1:8737
 python src/ig_bridge.py --port 8737 --verbose
 ```
 
-看到 `ig-bridge 監聽 http://127.0.0.1:8737` 就成功。讓它一直開著（另一個終端、或 Windows
+> **插件會自己開 sidecar**（`unofficial.autoStart: true`，預設）。只有想自己控制、或者
+> 想睇住它輸出時，才需要手動跑下面這一步；設定頁可以睇到 running／managed／Python 依賴狀態，
+> 亦可以「啟動／重新啟動」。
+>看到 `ig-bridge 監聽 http://127.0.0.1:8737` 就成功。讓它一直開著（另一個終端、或 Windows
 的工作排程／NSSM；不要用 UAC 提權）。
 
 `sidecar-token` 會自動生成在 `<dataDir>/sidecar-token`，Node 那邊會讀同一個檔案，

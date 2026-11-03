@@ -48,7 +48,13 @@
   不會把今日的預設值烙進檔案）。
 - **console 唔再依附 webhook** — `/ig-life/console` 與 `/ig-life/media` 只要有 webServer 就掛，
   即使 `webhook.enabled: false`；只有 Meta 的 webhook 路由跟嗰個開關走。
-- **`docs/UNOFFICIAL.md`** — 大字警告、五分鐘設定、HTTP 契約、錯誤碼表、撤退步驟。
+- **插件自己管 sidecar** — `unofficial.autoStart`（預設開）：掛載時 `/health` 冇回應就自動 spawn
+  `src/ig_bridge.py --serve --data-dir <dataDir>`，已有人在跑就直接接管；列出 Python／依賴狀態，
+  設定頁有「啟動／重新啟動／檢查依賴」。裝好之後唔需要再開終端。子進程只讀同一個 dataDir
+  （包括 `sidecar-token`），所以自訂 dataDir 都唔會撞 401。
+- **相容範圍擴到 0.2.x** — `peerDependencies` 由 `^0.1.1-rc.2` 擴到
+  `^0.1.1-rc.2 || ^0.2.0 || ^0.2.1-rc.5`。之前 0.2.1 桌面 app 會靜靜跳過插件，要人手寫
+  `compatibility.json`；現在新裝唔需要。0.2.2-rc.x 這類未出 prerelease 仍要豁免（semver 規則）。- **`docs/UNOFFICIAL.md`** — 大字警告、五分鐘設定、HTTP 契約、錯誤碼表、撤退步驟。
 - **`src/test_ig_bridge.py`** — 34 個 sidecar 測試：訊息正規化、額度、媒體白名單、token、
   HTTP 契約、BOM 容忍。只用標準庫、用假 client，不需要 instagrapi、不碰網絡。
 

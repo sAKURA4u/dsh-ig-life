@@ -168,7 +168,8 @@ test('transport=unofficial wires an inbound poller and needs no webhook', async 
     dataDir,
     transport: 'unofficial',
     webhook: { enabled: false },
-    unofficial: { pollSeconds: 15, pollJitterSeconds: 0 },
+    // Never spawn a real Python process from a unit test.
+    unofficial: { pollSeconds: 15, pollJitterSeconds: 0, autoStart: false },
   })
 
   assert.ok(handle, 'the unofficial transport must mount without a server')

@@ -114,7 +114,17 @@ dsh plugin --profile web add /path/to/dsh-ig-life
   存檔寫入 `<dataDir>/settings.json`（只寫這些欄位，**永遠唔會寫 token**）。
 - 每個選項下面都有一句說明：它做什麼、代價是什麼。
 
-如果嗰頁冇出現（例如 client bundle 註冊失敗），`/ig-life/console` 一樣改得到；
+
+### 📦 畀別人用：三步
+
+1. 對方裝插件：`dsh plugin --profile web add <repo>`（桌面 app 就在「內置插件」加）。
+2. 對方裝一次 Python 依賴（唯一要開終端的一次）：
+   `python -m pip install -r src/requirements.txt`
+3. 開 DSH → 設定 → Instagram 人生：填小號帳密 → 儲存並登入 → 按「改用 unofficial」→ 重啟。
+
+sidecar **由插件自己啟動同接管**（`unofficial.autoStart`），唔需要對方開終端養住一個進程；
+設定頁會顯示 Python 依賴同 sidecar 狀態。相容範圍已覆蓋 DSH 0.1.x 同 0.2.x，唔需要再手寫
+`compatibility.json`。如果嗰頁冇出現（例如 client bundle 註冊失敗），`/ig-life/console` 一樣改得到；
 整頁包在自己的 error boundary 裡，壞掉都唔會拖死其他設定頁。
 
 <details>

@@ -9,7 +9,9 @@
 DSH 桌面 app（`0.2.1-rc.5`，`resources/app.asar`）曾經**不會掛載本插件**；2026-11-03 23:22
 已喺 app 內成功掛載（`tools registered: 21 (ok)`）。根因同出口如下。
 
-### 根因：DSH 0.2 的插件相容性閘（不是 loader、不是 path、不是 row）
+> **後續（2026-11-04）**：`peerDependencies` 已擴到 `^0.1.1-rc.2 || ^0.2.0 || ^0.2.1-rc.5`，
+> 新安裝唔再需要 `compatibility.json`；舊的豁免檔可以留著（無害）或刪走。
+>### 根因：DSH 0.2 的插件相容性閘（不是 loader、不是 path、不是 row）
 
 DSH 0.2 的啟動器（`@deepseek-ai/dsh-app-boot`）逐個 bundle 檢查相容性，**唔符就靜靜跳過**，
 只寫 `skipping profile bundle ...` 去 stderr —— Electron 冇 console，所以完全睇唔到。

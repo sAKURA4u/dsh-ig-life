@@ -1075,6 +1075,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Local sidecar for dsh-ig-life's unofficial transport (a personal IG account).",
         epilog="⚠️ 非官方私有 API：違反 IG 條款，可能封號。用可以犧牲嘅小號。",
     )
+    parser.add_argument("--serve", action="store_true", help="開始服務（其實是預設動作，這個 flag 只為講清楚）")
     parser.add_argument("--set-credentials", action="store_true", help="互動輸入 IG 帳號密碼（不會回顯），寫入 <dataDir>/ig-secrets.json")
     parser.add_argument("--login", action="store_true", help="登入一次（會先重用 session 檔），然後結束")
     parser.add_argument("--relogin", action="store_true", help="強制用密碼重新登入（最大封號風險）")

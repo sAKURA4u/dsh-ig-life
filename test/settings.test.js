@@ -303,6 +303,51 @@ test('the account works before the transport is switched to unofficial', async (
   assert.equal(JSON.parse(res.body).configuredTransport, 'dryrun')
 })
 
+test('the sidecar route reports and controls the supervisor', async () => {
+  const calls = []
+  const sidecar = {
+    status: async () => ({ running: true, managed: true, deps: true, port: '8737' }),
+    checkDeps: () => true,
+    start: async () => {
+      calls.push('start')
+    },
+    stop: () => {
+      calls.push('stop')
+    },
+    logFile: 'C:/tmp/sidecar.log',
+  }
+  const routes = createConsole({
+    bridge: { status: () => ({}), recentInbox: () => [] },
+    life: null,
+    stickers: null,
+    slang: null,
+    people: null,
+    voice: null,
+    memory: { stats: () => ({}) },
+    transport: { health: async () => ({ ok: true }) },
+    config: { ...resolveConfig({ transport: 'unofficial' }).config },
+    dataDir: dataDir(),
+    logger: () => {},
+    sidecar,
+  })
+  const handler = routes.find((entry) => entry.path === '/ig-life/console/api/sidecar').handler
+
+  const getRes = fakeRes()
+  await handler(loopback, getRes)
+  const fetched = JSON.parse(getRes.body)
+  assert.equal(fetched.ok, true)
+  assert.equal(fetched.status.running, true)
+  assert.equal(fetched.status.deps, true)
+
+  const postRes = fakeRes()
+  await handler(
+    { method: 'POST', socket: { remoteAddress: '127.0.0.1' }, headers: {}, body: Buffer.from(JSON.stringify({ action: 'restart' })) },
+    postRes,
+  )
+  assert.equal(postRes.statusCode, 200)
+  assert.deepEqual(calls, ['stop', 'start'])
+})
+
 // ------------------------------------------------------- browser client bundle
 test('the hand-written client bundle registers a settings section', () => {
   const source = fs.readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
