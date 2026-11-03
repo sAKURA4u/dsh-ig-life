@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['20', '22', '24']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # Zero runtime dependencies: there is nothing to install.
+      #
+      # No `node --check` loop here on purpose: it parses scripts in the SCRIPT
+      # goal and therefore rejects top-level await, which valid ESM in this repo
+      # uses. Executing the modules below is both portable and stronger evidence.
+
+      - name: Unit tests
+        run: npm test
+
+      - name: End-to-end self check (dry run, no network)
+        run: node scripts/self-check.mjs
+
+      # Skips itself (exit 0) where DSH is not installed, which is every CI box.
+      - name: Loader contract under the real Cordis runtime
+        run: node scripts/loader-smoke.mjs
+
+      - name: Verify the bundle declares itself correctly
+        shell: bash
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const assert = require('node:assert');
+            const fs = require('node:fs');
+            assert.ok(pkg.dsh?.bundle?.patch, 'package.json must declare dsh.bundle.patch');
+            assert.ok(fs.existsSync(pkg.dsh.bundle.patch), 'the patch file must exist');
+            assert.ok(fs.existsSync(pkg.main), 'main must exist');
+            assert.ok(pkg.files.includes('cordis.patch.yml'), 'files must ship the patch');
+            assert.ok(pkg.type === 'module', 'must be ESM');
+            const patch = fs.readFileSync(pkg.dsh.bundle.patch, 'utf8');
+            assert.ok(patch.includes(pkg.name), 'the patch must mount this package by name');
+            console.log('bundle manifest ok');
+          "
+
+  workflow-lint:
+    name: patch is loadable yaml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Parse cordis.patch.yml
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const text = fs.readFileSync('cordis.patch.yml', 'utf8');
+            if (!/^- insert:/m.test(text)) { console.error('patch must start with a patch list'); process.exit(1) }
+            console.log('patch yaml looks right');
+          "
