@@ -77,10 +77,10 @@ test('apply mounts the webhook and the tick when asked to', async () => {
   })
 
   assert.equal(handle.webhookPath, '/ig-life/webhook')
-  assert.deepEqual(
-    routes.map((route) => route.path),
-    ['/ig-life/webhook', '/ig-life/media'],
-  )
+  const paths = routes.map((route) => route.path)
+  assert.ok(paths.includes('/ig-life/webhook'), 'webhook route')
+  assert.ok(paths.includes('/ig-life/media'), 'media route')
+  assert.ok(paths.includes('/ig-life/console'), 'console page') // the rest of the routes are its JSON API
   assert.equal(calls.intervals.length, 1)
   assert.equal(calls.intervals[0].ms, 30_000)
 })
