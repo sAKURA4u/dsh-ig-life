@@ -118,8 +118,8 @@ dsh plugin --profile web add /path/to/dsh-ig-life
 ### 📦 畀別人用：三步
 
 1. 對方裝插件：`dsh plugin --profile web add <repo>`（桌面 app 就在「內置插件」加）。
-2. 對方裝一次 Python 依賴（唯一要開終端的一次）：
-   `python -m pip install -r src/requirements.txt`
+2. 對方只要裝好 Python（3.9+）。依賴可以在設定頁按 **「安裝依賴」**（插件代跑
+   `python -m pip install -r src/requirements.txt`），或者自己喺 repo 跑一次。
 3. 開 DSH → 設定 → Instagram 人生：填小號帳密 → 儲存並登入 → 按「改用 unofficial」→ 重啟。
 
 sidecar **由插件自己啟動同接管**（`unofficial.autoStart`），唔需要對方開終端養住一個進程；

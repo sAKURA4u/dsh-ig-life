@@ -123,8 +123,8 @@ The plugin contributes its own page to **DSH → Settings → Instagram 人生**
 ### 📦 Handing it to someone else
 
 1. They install the plugin: `dsh plugin --profile web add <repo>` (or the desktop app's plugin manager).
-2. They install the Python dependency once — the only terminal step:
-   `python -m pip install -r src/requirements.txt`
+2. They only need Python (3.9+). The settings page's **Install dependencies** button runs
+   `python -m pip install -r src/requirements.txt` for them (or they can run it in the repo).
 3. DSH → Settings → Instagram 人生: type the account, **Save and log in**, press **switch to unofficial**, restart.
 
 The plugin **starts and adopts the sidecar itself** (`unofficial.autoStart`), so nobody has to keep a

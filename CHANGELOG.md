@@ -52,6 +52,9 @@
   `src/ig_bridge.py --serve --data-dir <dataDir>`，已有人在跑就直接接管；列出 Python／依賴狀態，
   設定頁有「啟動／重新啟動／檢查依賴」。裝好之後唔需要再開終端。子進程只讀同一個 dataDir
   （包括 `sidecar-token`），所以自訂 dataDir 都唔會撞 401。
+- **「安裝依賴」按鈕** — 設定頁一按就跑 `python -m pip install -r src/requirements.txt`（非阻塞、
+  5 分鐘上限、輸出回傳）；只有用戶明確按下去才會裝東西。對外派發時，對方只剩「裝 Python」
+  同「填帳號」兩件事。
 - **相容範圍擴到 0.2.x** — `peerDependencies` 由 `^0.1.1-rc.2` 擴到
   `^0.1.1-rc.2 || ^0.2.0 || ^0.2.1-rc.5`。之前 0.2.1 桌面 app 會靜靜跳過插件，要人手寫
   `compatibility.json`；現在新裝唔需要。0.2.2-rc.x 這類未出 prerelease 仍要豁免（semver 規則）。- **`docs/UNOFFICIAL.md`** — 大字警告、五分鐘設定、HTTP 契約、錯誤碼表、撤退步驟。

@@ -30,7 +30,7 @@ function upOnly(up) {
   return async () => ({ ok: up })
 }
 
-function supervisor({ up = false, spawnImpl = null, fetchImpl = null, spawnSyncImpl = null } = {}) {
+function supervisor({ up = false, spawnImpl = null, fetchImpl = null, spawnSyncImpl = null, pluginRoot = null } = {}) {
   const store = { dir: tempDir('ig-life-sidecar-') }
   const config = makeConfig({ transport: 'unofficial', unofficial: { autoStart: true, startTimeoutSeconds: 5 } })
   const calls = []
@@ -52,7 +52,7 @@ function supervisor({ up = false, spawnImpl = null, fetchImpl = null, spawnSyncI
       return () => (t += 100)
     })(),
     platform: 'win32',
-    pluginRoot: path.resolve('D:/fake/plugin'),
+    pluginRoot: pluginRoot ?? path.resolve('D:/fake/plugin'),
   })
   return { supervisor: supervisorInstance, store, calls, config }
 }
@@ -150,4 +150,45 @@ test('status points at the log file inside the data dir', async () => {
   assert.equal(state.logFile, path.join(store.dir, 'sidecar.log'))
   assert.equal(state.port, '8737')
   assert.equal(state.script.endsWith('ig_bridge.py'), true)
+})
+
+test('installDeps runs pip against the shipped requirements file', async () => {
+  const calls = []
+  const { supervisor: sup } = supervisor({
+    pluginRoot: path.resolve('.'),
+    spawnImpl: (command, args) => {
+      calls.push({ command, args })
+      const child = fakeChild()
+      queueMicrotask(() => {
+        child.stdout.emit('data', 'Successfully installed instagrapi-2.1.2')
+        child.emit('exit', 0)
+      })
+      return child
+    },
+  })
+  const result = await sup.installDeps()
+  assert.equal(result.ok, true)
+  assert.match(result.output, /Successfully installed/)
+  assert.deepEqual(calls[0].args.slice(0, 3), ['-m', 'pip', 'install'])
+  assert.equal(calls[0].args[3], '-r')
+  assert.match(calls[0].args[4], /requirements\.txt$/)
+  assert.equal((await sup.status()).deps, true, 'a successful install marks the dependency present')
+})
+
+test('a failing pip is reported with its output', async () => {
+  const { supervisor: sup } = supervisor({
+    pluginRoot: path.resolve('.'),
+    spawnImpl: () => {
+      const child = fakeChild()
+      queueMicrotask(() => {
+        child.stderr.emit('data', 'ERROR: No matching distribution found for instagrapi')
+        child.emit('exit', 1)
+      })
+      return child
+    },
+  })
+  const result = await sup.installDeps()
+  assert.equal(result.ok, false)
+  assert.equal(result.code, 'IG_DEPS_FAILED')
+  assert.match(result.output, /No matching distribution/)
 })
