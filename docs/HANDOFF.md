@@ -53,7 +53,7 @@ Creator／Business，所以「像 QQ 那樣用普通帳號」只有私有 API �
 | `src/ig_bridge.py` | sidecar：登入、session 重用、輪詢、發送、發帖、回留言、額度、媒體白名單、token |
 | `lib/transport/unofficial.js` | Node 的 HTTP client：token、錯誤碼映射、本地額度／間隔、`poll()` 正規化 |
 | `lib/poll.js` | 入站輪詢：地板 10 秒、jitter、指數退避、重疊保護、可 dispose |
-| `src/test_ig_bridge.py` | 33 個 sidecar 測試（假 client，不需要 instagrapi、不碰網絡） |
+| `src/test_ig_bridge.py` | 34 個 sidecar 測試（假 client，不需要 instagrapi、不碰網絡） |
 | `docs/UNOFFICIAL.md` | 大字警告、五分鐘設定、HTTP 契約、錯誤碼表、撤退步驟 |
 
 ### 決定（不要再重新討論）
@@ -89,9 +89,9 @@ Creator／Business，所以「像 QQ 那樣用普通帳號」只有私有 API �
 
 ## 3. 現況基線
 
-- **186 個 JS 測試** + **33 個 Python sidecar 測試**，全綠
+- **186 個 JS 測試** + **34 個 Python sidecar 測試**，全綠
 - `node scripts/loader-smoke.mjs`（真 Cordis）全綠
-- CI：Node 20/22/24 × Ubuntu/Windows 全綠（Python 測試要手動跑：`python src/test_ig_bridge.py`）
+- CI：Node 20/22/24 × Ubuntu/Windows + 一個 `python sidecar` job（`py_compile` + stdlib 測試）
 - Release：`v0.3.0`；CHANGELOG 中英
 - 可用入口：`dsh web` → `/ig-life/console`；桌面 `睇大肥魚狀態.cmd` → 直接讀資料檔
 - 三副身體：`dryrun`（預設）、`graph`（官方，需要專業帳號）、`unofficial`（普通帳號，會封號）

@@ -145,7 +145,7 @@ tick（預設 300 秒）
 
 ```bash
 npm test                       # 186 個測試，零依賴、零網絡
-python src/test_ig_bridge.py   # sidecar 的測試（33 個，只用標準庫）
+python src/test_ig_bridge.py   # sidecar 的測試（34 個，只用標準庫）
 node scripts/self-check.mjs    # 端到端示範（dryrun + 假大腦）
 node scripts/link-dsh.mjs      # 把本機 DSH 套件 link 進來，讓工具註冊走真 defineTool
 ```

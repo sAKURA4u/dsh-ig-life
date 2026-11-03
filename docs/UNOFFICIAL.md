@@ -71,22 +71,21 @@ python -m pip install -r src/requirements.txt
 資料夾預設是 `~/.dsh/ig-life/`（`DSH_HOME` 有設就跟著走）。
 
 ```bash
-# macOS / Linux
-mkdir -p ~/.dsh/ig-life
-chmod 700 ~/.dsh/ig-life
-cat > ~/.dsh/ig-life/ig-secrets.json <<'JSON'
-{ "username": "your_throwaway_account", "password": "..." }
-JSON
-chmod 600 ~/.dsh/ig-life/ig-secrets.json
+python src/ig_bridge.py --set-credentials
 ```
+
+它會問 username 同 password（輸入時不會顯示、不會留在 shell 歷史、不會出現在任何 log），
+確認兩次之後寫入 `<dataDir>/ig-secrets.json`，權限 0600。
+
+想自己建檔也可以，但**唔好用 Windows PowerShell 5.1 的 `Set-Content -Encoding utf8`** ——
+它會偷偷加 BOM（sidecar 現在容忍，但其他工具未必）：
 
 ```powershell
 # Windows PowerShell
 $dir = Join-Path $env:USERPROFILE '.dsh\ig-life'
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
-'{ "username": "your_throwaway_account", "password": "..." }' |
-  Set-Content -Encoding utf8 (Join-Path $dir 'ig-secrets.json')
-icacls (Join-Path $dir 'ig-secrets.json') /inheritance:r /grant:r "$($env:USERNAME):(F)"
+[IO.File]::WriteAllText((Join-Path $dir 'ig-secrets.json'),
+  '{"username":"your_throwaway_account","password":"..."}')
 ```
 
 > 也可以用 `IG_USERNAME` / `IG_PASSWORD` 環境變數，但環境變數會出現在進程列表和 shell

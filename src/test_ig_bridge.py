@@ -402,6 +402,14 @@ class LimitTest(unittest.TestCase):
         self.assertEqual(mapped.code, "IG_CHALLENGE_REQUIRED")
         self.assertEqual(mapped.status, 403)
 
+    def test_a_bom_in_a_json_file_is_tolerated(self):
+        # Windows PowerShell 5.1 writes UTF-8 with a BOM; json.loads rejects it.
+        path = Path(self.tmp.name) / "ig-secrets.json"
+        path.write_bytes(b'\xef\xbb\xbf{"username": "me", "password": "pw"}')
+        loaded = igb.load_json(path, {})
+        self.assertEqual(loaded["username"], "me")
+        self.assertTrue(path.exists(), "a readable file must not be quarantined")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

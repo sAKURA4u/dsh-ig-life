@@ -222,7 +222,9 @@ def _as_int(value, default: int = 0) -> int:
 
 def load_json(path: Path, default):
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        # utf-8-sig: Windows PowerShell 5.1's `Set-Content -Encoding utf8` writes
+        # a BOM, and a BOM makes json.loads raise. Tolerate it silently.
+        return json.loads(path.read_text(encoding="utf-8-sig"))
     except FileNotFoundError:
         return default
     except (OSError, ValueError) as error:
@@ -484,7 +486,7 @@ class Bridge:
             raise BridgeError(
                 "IG_NO_CREDENTIALS",
                 "未找到 IG 帳號密碼",
-                f'寫入 {secret_file}：{{"username": "...", "password": "..."}} 並設為 0600；或用 IG_USERNAME / IG_PASSWORD 環境變數',
+                f'跑 python src/ig_bridge.py --set-credentials（互動輸入，不會回顯）；或手動寫入 {secret_file} 並設為 0600',
                 503,
             )
         try:
@@ -1017,6 +1019,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Local sidecar for dsh-ig-life's unofficial transport (a personal IG account).",
         epilog="⚠️ 非官方私有 API：違反 IG 條款，可能封號。用可以犧牲嘅小號。",
     )
+    parser.add_argument("--set-credentials", action="store_true", help="互動輸入 IG 帳號密碼（不會回顯），寫入 <dataDir>/ig-secrets.json")
     parser.add_argument("--login", action="store_true", help="登入一次（會先重用 session 檔），然後結束")
     parser.add_argument("--relogin", action="store_true", help="強制用密碼重新登入（最大封號風險）")
     parser.add_argument("--health", action="store_true", help="印出目前 session／額度狀態")
@@ -1033,6 +1036,44 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def set_credentials(data_dir: Path) -> int:
+    """
+    Prompt for the account once and store it 0600.
+
+    Hand-editing ig-secrets.json is the usual way to get this wrong: quoting,
+    a BOM from an old PowerShell, the password ending up in shell history. The
+    password is typed here, never echoed, never logged, never sent anywhere.
+    """
+    import getpass
+
+    if not sys.stdin.isatty():
+        print("要喺終端機直接執行才可以互動輸入密碼（--set-credentials）", file=sys.stderr)
+        return 2
+    print("⚠️ 用一個可以犧牲的小號。密碼只會寫入本機，不會出現在任何 log 或對話。")
+    try:
+        username = input("IG username（小號，不用 @）: ").strip().lstrip("@")
+        if not username:
+            print("username 不能空白，沒有寫入", file=sys.stderr)
+            return 2
+        password = getpass.getpass("IG password（輸入時不會顯示）: ")
+        if not password:
+            print("password 不能空白，沒有寫入", file=sys.stderr)
+            return 2
+        again = getpass.getpass("再輸入一次（確認沒有打錯）: ")
+    except (EOFError, KeyboardInterrupt):
+        print("\n取消，沒有寫入", file=sys.stderr)
+        return 2
+    if again != password:
+        print("兩次不一樣，沒有寫入（舊檔案未改動）", file=sys.stderr)
+        return 2
+
+    target = data_dir / "ig-secrets.json"
+    secure_write(target, json.dumps({"username": username, "password": password}, ensure_ascii=False, indent=2) + "\n")
+    print(f"已寫入 {target}（權限 0600）。")
+    print("下一步：python src/ig_bridge.py --login")
+    return 0
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     data_dir = resolve_data_dir(args.data_dir)
@@ -1043,6 +1084,9 @@ def main(argv=None) -> int:
     if args.print_token:
         print(token)
         return 0
+
+    if args.set_credentials:
+        return set_credentials(data_dir)
 
     media_roots = [data_dir] + list(args.media_root or [])
     bridge = Bridge(

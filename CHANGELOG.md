@@ -26,9 +26,11 @@
   所以沒有一條路可以繞過上限。
 - **sidecar 媒體白名單** — 只准上傳 `--media-root`（預設 `<dataDir>`）之內的檔案，
   避免有人（或一個 bug）把整部機的檔案傳上去。
+- **`--set-credentials`** — 互動輸入小號帳密（不回顯、不進 shell 歷史），sidecar 以 0600 寫入；
+  同時容忍 Windows PowerShell 寫出的 UTF-8 BOM（以前會令密碼檔「讀不到」而被隔離）。
 - **`docs/UNOFFICIAL.md`** — 大字警告、五分鐘設定、HTTP 契約、錯誤碼表、撤退步驟。
-- **`src/test_ig_bridge.py`** — 33 個 sidecar 測試：訊息正規化、額度、媒體白名單、token、
-  HTTP 契約。只用標準庫、用假 client，不需要 instagrapi、不碰網絡。
+- **`src/test_ig_bridge.py`** — 34 個 sidecar 測試：訊息正規化、額度、媒體白名單、token、
+  HTTP 契約、BOM 容忍。只用標準庫、用假 client，不需要 instagrapi、不碰網絡。
 
 ### 修正
 
