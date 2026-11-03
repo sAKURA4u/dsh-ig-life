@@ -1,5 +1,6 @@
-﻿import assert from 'node:assert/strict'
+import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import path from 'node:path'
 import test from 'node:test'
 
 import { mount as apply, inject, name } from '../lib/index.js'
@@ -148,6 +149,16 @@ test('apply respects enabled: false', async () => {
   const handle = await apply(ctx, { enabled: false })
   assert.ok(!handle, 'disabled mount must not yield a handle')
   assert.equal(calls.effects.length, 0)
+})
+
+test('the boot trace records the enter line even on a brand-new data dir', async () => {
+  const dataDir = tempDir()
+  const { ctx } = mockCtx()
+  await apply(ctx, { dataDir, transport: 'dryrun' })
+
+  const log = fs.readFileSync(path.join(dataDir, 'boot.log'), 'utf8')
+  assert.match(log, /--- apply\(\) enter \(pid \d+\) ---/, 'the first line must not be lost to ENOENT')
+  assert.match(log, /mounted ok/)
 })
 
 test('transport=unofficial wires an inbound poller and needs no webhook', async () => {

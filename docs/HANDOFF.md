@@ -40,8 +40,66 @@ dsh 0.1.1-rc.2（npm CLI）            vs ^0.1.1-rc.2 -> true    ← 掛得到
 已寫入 `~/.dsh/profiles/desktop/compatibility.json`。等價於 app 插件管理器／
 `dsh plugin allow-version` 的「接受風險」授權；**唔會**改 manifest，移除檔案即撤回。
 
+> ⚠️ **呢個檔案唔可以有 BOM。** PowerShell 5.1／部分環境的 `Set-Content -Encoding utf8`
+> 會加 BOM，DSH 的 `JSON.parse` 會失敗，然後**靜靜當作冇豁免**（warning 只寫去 stderr）。
+> 用 `[IO.File]::WriteAllText($path, $json, (New-Object Text.UTF8Encoding($false)))`。
+> 第一次就係踩了呢個：檔案存在、內容正確，但豁免完全冇生效。
+
+### 診斷方法（可重用，唔需要 DevTools）
+
+app 內的 DSH runtime 可以直接當 node 用，叫它自己解釋一次 profile 組合：
+
+```powershell
+$env:ELECTRON_RUN_AS_NODE = '1'
+& 'D:\Users\felix\AppData\Local\Programs\DeepSeek Harness\DeepSeek Harness.exe' probe.mjs
+```
+
+`probe.mjs`：
+
+```js
+const ASAR = 'D:/Users/felix/AppData/Local/Programs/DeepSeek Harness/resources/app.asar'
+const boot = await import(`file:///${ASAR}/dsh/node_modules/@deepseek-ai/dsh-app-boot/lib/index.js`)
+const profile = boot.loadProfileDirectory('dsh', 'C:\\Users\\felix\\.dsh\\profiles\\desktop', `${ASAR}/dsh/package.json`)
+console.log(JSON.stringify({ layers: profile.layers.map((l) => l.packageName), skipped: profile.skippedBundles }, null, 2))
+```
+
+這次的實測輸出（豁免修好之後）：
+
+```
+exemptions: {"dsh-ig-life@0.3.0":["0.2.1-rc.5"]}  warnings: []
+layers: ["@deepseek-ai/dsh-base","@deepseek-ai/dsh-web-app","dsh-ig-life"]
+skipped: []
+entries: […, "ui-settings-plugins", …, "ig-life"]
+```
+
+`skippedBundles[].reason` 就係之前一直睇唔到的那句錯誤 —— 它只會寫去 stderr，
+Electron app 冇 console，所以整條線索斷在這裡。
+
+### 預檢：插件在 0.2.1-rc.5 真的跑得起來
+
+用**隔離的 `DSH_HOME`** + app 自己的 CLI（唔碰用戶 profile、唔開 GUI）boot 一次：
+
+```powershell
+$env:ELECTRON_RUN_AS_NODE = '1'; $env:DSH_HOME = "$env:TEMP\dsh-preflight"
+& 'D:\...\DeepSeek Harness.exe' 'D:\...\app.asar\dsh\node_modules\@deepseek-ai\dsh\lib\bin.js' `
+  --profile preflight --port 0 --no-open
+```
+
+```
+tools registered: 21 (ok)
+mounted ok
+```
+
+所以 `transport`、工具註冊、webServer 在 0.2.1 都正常；剩下的風險只在 agent engine
+（要真人對話才驗得到）。**呢個方法係日後測 app 相容性最快的路**：唔使重啟 app。
+
+> 修過一個相關 bug：`makeTrace` 以前唔會先 `mkdir`，**全新 data dir 的第一行
+> `apply() enter` 會寫失**（ENOENT 被吞）。偏偏那行就係「插件有冇被呼叫」的唯一證據。
+> 現在 `lib/index.js` 建 trace 時先建資料夾，測試 `plugin.test.js` 釘住。
+
 > 未做：把 `peerDependencies` 的範圍正式擴到 `0.2.x`。那等於宣稱已在 0.2 驗證過 ——
-> 應該先在 0.2.1-rc.5 真正跑通（tools 註冊、agent、webServer），再改 manifest 出 release。
+> 應該先在 0.2.1-rc.5 真正跑通（tools 註冊已過、agent 未驗），再改 manifest 出 release。
+> 另外豁免係**精確版本**：app 一升級（例如 0.2.2-rc.x）就要再加一條，否則又會被跳過。
 
 ### 已排除的假設（全部實測過，不要再試）
 
