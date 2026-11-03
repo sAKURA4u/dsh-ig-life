@@ -18,11 +18,20 @@
                  │      │                     └─ 模型自己呼叫 ig_send_dm 工具        │
                  │      └── engine=llm   ─▶ ctx.llm.stream(...) → 我們代發          │
                  │                                                        │        │
-                 │  transport (graph | dryrun) ◀──────────────────────────┘        │
+                 │  transport (graph | unofficial | dryrun) ◀─────────────┘        │
                  └─────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
                             Instagram / outbox.jsonl
+```
+
+另一副身體（`transport: unofficial`）只是換掉「入站」那一行 —— 沒有 webhook，改用拉的：
+
+```
+sidecar 127.0.0.1:8737 ◀── poll.js 每 20 秒 ± 隨機 ──▶ transport.poll()
+                                                          │
+                              與 webhook 正規化後同一個形狀 ▼
+                                                    bridge.ingest()
 ```
 
 同時，`life.js` 每一 tick 推進一次「身體狀態」（體力、心情、清醒），在合適的時候自己找你講話或發帖；`book.js` + `memory.js` 負責記憶的分層與遺忘。
@@ -81,10 +90,34 @@ DSH 0.2 之後 `ctx.agents` / `ctx.llm` / `ctx.storage` / `ctx.webServer` / `ctx
 | `lib/persona.js` | 讀人格 markdown、產生 Instagram 協議、播種記憶 |
 | `lib/bridge.js` | 收訊 → DSH turn → 發訊；兩個 reply engine |
 | `lib/life.js` | 狀態推進、主動私訊、自發發帖、內心獨白 |
-| `lib/tools.js` | 10 個模型工具（`defineTool`） |
+| `lib/tools.js` | 21 個模型工具（`defineTool`） |
 | `lib/webhook.js` | Meta 握手、HMAC 驗簽、事件正規化 |
-| `lib/transport/*` | `graph`（官方 API）/ `dryrun`（什麼都不發） |
+| `lib/poll.js` | 沒有 webhook 的身體：去抖、隨機、退避的入站輪詢 |
+| `lib/transport/*` | `graph`（官方 API）/ `unofficial`（本機 sidecar + 私有 API）/ `dryrun`（什麼都不發） |
+| `src/ig_bridge.py` | 非官方 sidecar：唯一持有 IG session 的進程，只看 127.0.0.1 |
 | `lib/store.js` | 原子寫入的 JSON + JSONL 日誌 |
+
+## 非官方 transport：把手機交給 sidecar
+
+`unofficial` 不是「另一個 API client」，而是**兩層**：
+
+```
+lib/transport/unofficial.js      只管 HTTP + 本地安全閥（額度、間隔、錯誤碼）
+        │  127.0.0.1 + x-ig-life-token
+        ▼
+src/ig_bridge.py                 唯一持有密碼與 session 的進程；決定 IG 的實際節奏
+```
+
+三條規則決定了這個切法：
+
+1. **密碼與 cookie 不進 Node**。Config、log、崩潰報告、提示詞都不會碰到它們。
+2. **sidecar 決定節奏**。最少 10 秒一次讀取、instagrapi 內建隨機延遲、自己再擋一次每日額度。
+   Node 那邊設定錯了，也不會直接打到 IG。
+3. **入站是拉的**。`transport.poll()` 回傳的 event 跟 webhook 正規化後**同一個形狀**，
+   所以 `bridge.ingest()` 完全不需要知道訊息是推進來還是拉回來。
+
+代價：私有協議隨時會變，這條路不保證一直可用。風險與完整設定見
+[UNOFFICIAL.md](UNOFFICIAL.md)。
 
 ## 兩種 reply engine
 
@@ -111,9 +144,10 @@ tick（預設 300 秒）
 ## 驗證
 
 ```bash
-npm test               # 73 個測試，零依賴、零網絡
-node scripts/self-check.mjs   # 端到端示範（dryrun + 假大腦）
-node scripts/link-dsh.mjs     # 把本機 DSH 套件 link 進來，讓工具註冊走真 defineTool
+npm test                       # 186 個測試，零依賴、零網絡
+python src/test_ig_bridge.py   # sidecar 的測試（33 個，只用標準庫）
+node scripts/self-check.mjs    # 端到端示範（dryrun + 假大腦）
+node scripts/link-dsh.mjs      # 把本機 DSH 套件 link 進來，讓工具註冊走真 defineTool
 ```
 
 ## 已知未驗證

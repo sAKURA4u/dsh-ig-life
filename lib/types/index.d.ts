@@ -11,8 +11,12 @@ export declare const configSchema: null
 
 export interface IgLifeConfig {
   enabled?: boolean
-  /** `dryrun` sends nothing anywhere; `graph` uses the official Meta API. */
-  transport?: 'dryrun' | 'graph'
+  /**
+   * `dryrun` sends nothing anywhere; `graph` is the official Meta API;
+   * `unofficial` drives a personal account through the local Python sidecar
+   * (violates Instagram's terms — see docs/UNOFFICIAL.md).
+   */
+  transport?: 'dryrun' | 'graph' | 'unofficial'
   ownerHandle?: string
   allowlist?: string[]
   replyToStrangers?: boolean
@@ -28,6 +32,22 @@ export interface IgLifeConfig {
     publicBaseUrl?: string
   }
   webhook?: { enabled?: boolean; path?: string; requireSignature?: boolean }
+  /**
+   * The unofficial transport's only contact with the account: a local HTTP
+   * sidecar that holds the session. No password ever reaches this process.
+   */
+  unofficial?: {
+    baseUrl?: string
+    /** Empty = read <dataDir>/sidecar-token. */
+    token?: string
+    /** Seconds between polls; the floor is 10 and cannot be configured away. */
+    pollSeconds?: number
+    pollJitterSeconds?: number
+    sendPerDay?: number
+    postPerDay?: number
+    sendGapSeconds?: number
+    requestTimeoutSeconds?: number
+  }
   bridge?: {
     enabled?: boolean
     agentPreset?: string
@@ -75,6 +95,8 @@ export interface IgLifeHandle {
   bridge: { engine: string; ingest(events: object[]): Promise<object>; status(): object }
   tools: { registered: string[]; failures?: string[]; reason: string }
   webhookPath: string | null
+  /** Present only when the transport polls for inbound messages. */
+  poll: { start(): unknown; stop(): unknown; stats(): object } | null
 }
 
 export declare function apply(ctx: Context, config?: IgLifeConfig): Promise<IgLifeHandle | undefined>

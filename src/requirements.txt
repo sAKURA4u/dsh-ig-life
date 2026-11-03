@@ -1,0 +1,11 @@
+# The unofficial transport's only dependency.
+#
+# instagrapi speaks Instagram's private API. It is a moving target: when
+# Instagram changes its signing, this package has to catch up, and until it
+# does the sidecar cannot log in. That is the maintenance cost of this path.
+#
+#   python -m pip install -r src/requirements.txt
+#
+# Pinned to the 2.x line on purpose — a major bump may change the private API
+# support in ways this sidecar has not been tested against.
+instagrapi>=2.1.2,<3

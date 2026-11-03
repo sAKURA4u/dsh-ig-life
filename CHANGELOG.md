@@ -4,6 +4,46 @@
 
 ---
 
+## [0.3.0] — 2026-11-03
+
+第二副身體：**普通 IG 帳號**。官方 Graph API 只服務 Creator／Business 帳號，所以「像 QQ 那樣用
+一個普通帳號養 agent」只有非官方私有 API 一條路。這一版把它做成獨立、預設關閉的 transport。
+
+### 新增
+
+- **非官方 transport（`transport: unofficial`）** — `lib/transport/unofficial.js` 經本機
+  Python sidecar（`src/ig_bridge.py`，instagrapi）收發私訊、傳圖、傳語音、發帖、回留言。
+  與 `graph` 同一介面，上面所有安全閥照樣生效。
+- **密碼與 session 只留在 sidecar** — `ig-secrets.json`、`ig-session.json` 由 sidecar 以 0600
+  寫入；Node 進程只是一個 HTTP client，帶 `x-ig-life-token`，只連 127.0.0.1。密碼不會出現在
+  config、log、提示詞或測試裡。
+- **session 重用優先，加登入退避** — 每次啟動先重用舊 session；10 分鐘內拒絕第二次全新登入。
+  崩潰重啟迴圈變成「不停登入」是最快的封號方式，這條路直接斬斷它。
+- **入站輪詢（`lib/poll.js`）** — 沒有 webhook 的身體用拉的：地板 10 秒、隨機 jitter、
+  失敗指數退避、同一時間只有一個 poll、unmount 時自動停。
+- **兩層每日額度** — Node 的 `unofficial.sendPerDay` / `postPerDay` / `sendGapSeconds`，加上
+  sidecar 自己的 `--send-per-day` / `--post-per-day`。生命時鐘的主動訊息也計入，
+  所以沒有一條路可以繞過上限。
+- **sidecar 媒體白名單** — 只准上傳 `--media-root`（預設 `<dataDir>`）之內的檔案，
+  避免有人（或一個 bug）把整部機的檔案傳上去。
+- **`docs/UNOFFICIAL.md`** — 大字警告、五分鐘設定、HTTP 契約、錯誤碼表、撤退步驟。
+- **`src/test_ig_bridge.py`** — 33 個 sidecar 測試：訊息正規化、額度、媒體白名單、token、
+  HTTP 契約。只用標準庫、用假 client，不需要 instagrapi、不碰網絡。
+
+### 修正
+
+- 這一版沒有改動官方 transport 的行為。
+
+### 已知限制
+
+- unofficial **收不到留言**（webhook 在這種模式下沒有作用），`ig_reply_comment` 要手上有
+  `mediaId` 才用得到。
+- 2FA 不支援；voice note 要 m4a／opus，TTS 的 mp3 會退回「檔案附件」。
+- 私有協議隨時會改。Instagram 一改簽名，登入就會壞，要等 instagrapi 更新 —— **壞了不保證修好**。
+- 非官方帳號會封。用一個可以犧牲的小號，先 dryrun 觀察一個星期。
+
+---
+
 ## [0.2.0] — 2026-11-03
 
 第一個「像人」的版本。0.1.0 只會打字；這一版會用聲講話、會忘記、也有自己的社交生活。

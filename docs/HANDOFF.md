@@ -41,41 +41,57 @@ E apply OK, returned undefined
 
 ---
 
-## 2. 非官方 transport（下一步要做的功能）
+## 2. 非官方 transport（已完成）
 
-**背景**：使用者要求「像 QQ 那樣用普通 IG 帳號」。官方 Graph API **只支援 Creator／Business 帳號**，所以普通個人帳號只能走非官方協議（`instagrapi`）。這是 Meta 的限制，不是實作選擇。
+`transport: unofficial` 已經實作，**預設關閉**，要明確選。官方 Graph API 只服務
+Creator／Business，所以「像 QQ 那樣用普通帳號」只有私有 API 一條路。
 
-**設計**（架構已預留：`lib/transport/` 可換）：
+### 檔案
 
-```
-src/ig_bridge.py（Python sidecar，用 instagrapi）
-  ├─ 首次 login 後 dump session.json，之後 reuse（最重要的防封措施）
-  ├─ localhost HTTP：
-  │    GET  /messages        回傳新私訊（含 thread_id / sender / text / attachments）
-  │    POST /send            {threadId|username, text}
-  │    POST /send_media      {threadId, path, type}
-  │    POST /post            {caption, imagePath}
-  │    GET  /health
-  └─ 風控：輪詢間隔 ≥10s、每日上限、隨機延遲
-lib/transport/unofficial.js
-  └─ 呼叫上面的 sidecar；與 graph.js 同一介面（sendDm / sendAttachment / postPhoto / replyComment / health）
-```
+| 檔案 | 職責 |
+|---|---|
+| `src/ig_bridge.py` | sidecar：登入、session 重用、輪詢、發送、發帖、回留言、額度、媒體白名單、token |
+| `lib/transport/unofficial.js` | Node 的 HTTP client：token、錯誤碼映射、本地額度／間隔、`poll()` 正規化 |
+| `lib/poll.js` | 入站輪詢：地板 10 秒、jitter、指數退避、重疊保護、可 dispose |
+| `src/test_ig_bridge.py` | 33 個 sidecar 測試（假 client，不需要 instagrapi、不碰網絡） |
+| `docs/UNOFFICIAL.md` | 大字警告、五分鐘設定、HTTP 契約、錯誤碼表、撤退步驟 |
 
-**必須遵守**：
+### 決定（不要再重新討論）
 
-1. **預設關閉**：`transport: 'unofficial'` 要使用者明確選擇。
-2. **密碼只在本機**：`~/.dsh/ig-life/ig-secrets.json`（0600），永不進 repo／log／對話。
-3. **README + `docs/UNOFFICIAL.md` 大字警告**：違反 IG 條款、可能封號、建議用可以犧牲的小號。
-4. **session 重用**優先於重新登入 —— 每次全新登入是最大的封號觸發點。
-5. 復用現有安全閥：白名單、每日額度、靜音時段、24 小時窗口、出站脫敏全部照生效。
+1. **密碼與 cookie 只在 sidecar**，Node 永遠不讀。理由：config、log、提示詞、崩潰報告全部
+   經過 Node。
+2. **sidecar 決定 IG 的實際節奏**（讀取地板 10 秒 + instagrapi `delay_range` 1.5–4 秒）。
+   Node 的 `pollSeconds` 只是「最少等幾久」，不是節奏來源。
+3. **入站用拉的**。`/messages` 回傳的 event 形狀 = `webhook.js` 正規化後的形狀，
+   所以 `bridge.ingest()` 完全沒有改。
+4. **兩層每日額度**：Node 擋一次、sidecar 再擋一次（防止有人直接 curl sidecar）。
+   生命時鐘的主動訊息也計入 Node 那一層。
+5. **節流時回空，不回放 cache**。回放會令同一條訊息重複進 inbox；已送出的 id
+   記在 `ig-bridge-state.json`。
+6. **登入退避 10 分鐘**：崩潰重啟 ≠ 登入風暴。只有 `--relogin` 可以無視。
+7. **媒體白名單**：sidecar 只准上傳 `<dataDir>`（與 `--media-root`）之內的檔案 ——
+   否則一個 bug 就可以把整部機的檔案傳上 IG。
+8. **token 自動共享**：`<dataDir>/sidecar-token`，兩邊讀同一個檔案；不做 config 複製。
 
-**風險**：非官方私有 API 的簽名／風控隨時改，維護成本會壓過專案。要在 `docs/UNOFFICIAL.md` 講明「壞了就修不保證」。
+### 未做（刻意或待辦）
+
+- **留言**：unofficial **收不到** comment 事件（沒有 webhook）。`ig_reply_comment` 要
+  `mediaId` 才用得到。要補就要在 sidecar 加 `media_comments` 輪詢，但那是另一倍的 API
+  呼叫，風險要另計 —— 不要為了功能對稱而加。
+- **voice note**：IG 要 m4a／opus。TTS 出 mp3，sidecar 先試 `direct_send_voice`，
+  失敗就 `direct_send_file`，回傳 `mode` 講清楚是哪一種。
+- **2FA**：不支援，會回 `IG_2FA_REQUIRED`。
+- **沒有**模擬瀏覽器指紋、代理輪換、多帳號。刻意不做。
+- **未在真實 IG 帳號上驗證過**（開發時沒有可用的小號）。JS 測試用假 fetch、Python 測試用
+  假 client。第一件事應該是 `python src/ig_bridge.py --login`，看真實回傳的錯誤碼。
 
 ---
 
 ## 3. 現況基線
 
-- 152 個測試、`node scripts/loader-smoke.mjs`（真 Cordis）全綠
-- CI：Node 20/22/24 × Ubuntu/Windows 全綠
-- Release：`v0.2.0`；CHANGELOG 中英
+- **186 個 JS 測試** + **33 個 Python sidecar 測試**，全綠
+- `node scripts/loader-smoke.mjs`（真 Cordis）全綠
+- CI：Node 20/22/24 × Ubuntu/Windows 全綠（Python 測試要手動跑：`python src/test_ig_bridge.py`）
+- Release：`v0.3.0`；CHANGELOG 中英
 - 可用入口：`dsh web` → `/ig-life/console`；桌面 `睇大肥魚狀態.cmd` → 直接讀資料檔
+- 三副身體：`dryrun`（預設）、`graph`（官方，需要專業帳號）、`unofficial`（普通帳號，會封號）

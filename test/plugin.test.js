@@ -150,6 +150,25 @@ test('apply respects enabled: false', async () => {
   assert.equal(calls.effects.length, 0)
 })
 
+test('transport=unofficial wires an inbound poller and needs no webhook', async () => {
+  const dataDir = tempDir()
+  const { ctx, calls } = mockCtx()
+  const handle = await apply(ctx, {
+    dataDir,
+    transport: 'unofficial',
+    webhook: { enabled: false },
+    unofficial: { pollSeconds: 15, pollJitterSeconds: 0 },
+  })
+
+  assert.ok(handle, 'the unofficial transport must mount without a server')
+  assert.equal(handle.transport.name, 'unofficial')
+  assert.ok(handle.poll, 'there must be a poller, or no DM would ever arrive')
+  assert.ok(calls.effects.includes('ig-life.poll()'), 'the poller must be disposed with the plugin')
+  assert.equal(handle.poll.stats().intervalMs, 15_000)
+  assert.equal(handle.webhookPath, null, 'the webhook is not what delivers DMs here')
+  handle.poll.stop()
+})
+
 test('tools register when the host exposes a tools service and dsh-tools resolves', async (t) => {
   const dataDir = tempDir()
   const registered = []

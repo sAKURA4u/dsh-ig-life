@@ -21,9 +21,11 @@
 <br />
 
 > **One-minute demo**: no Instagram account, no API key — this only shows how it talks.
-> Sending and receiving real DMs needs **an Instagram professional account, a Meta app
-> long-lived token and a public HTTPS tunnel**; see [docs/IG-SETUP.md](docs/IG-SETUP.md).
-> You never hand over a password.
+> Real DMs need one of two bodies: the **official** one (an Instagram professional account,
+> a Meta app long-lived token and a public HTTPS tunnel — [docs/IG-SETUP.md](docs/IG-SETUP.md)),
+> or the **unofficial** one (a plain personal account through a local Python sidecar —
+> [docs/UNOFFICIAL.md](docs/UNOFFICIAL.md); it violates Instagram's terms and can get the
+> account banned). The plugin itself never receives your password.
 >
 > ```bash
 > git clone https://github.com/sAKURA4u/dsh-ig-life && cd dsh-ig-life
@@ -86,11 +88,24 @@ dsh plugin --profile web add /path/to/dsh-ig-life
 Restart DSH and you should see:
 
 ```text
-[ig-life] ready · transport=dryrun · engine=agent · tools=21 · webhook=/ig-life/webhook · life=off · memory=7
+[ig-life] ready · transport=dryrun · engine=agent · tools=21 · webhook=/ig-life/webhook · poll=off · life=off · memory=7
 ```
 
 **Dry-run by default**: nothing leaves the machine, everything lands in `~/.dsh/ig-life/outbox.jsonl`.
-Read it for a week. Only then switch to `transport: graph`.
+Read it for a week. Only then switch to a real body.
+
+### Three bodies, one character
+
+| `transport` | Account | Needs | The catch |
+|---|---|---|---|
+| `dryrun` | none | nothing | sends nothing; a transcript only |
+| `graph` | Creator/Business | Meta app, long-lived token, public HTTPS | App Review for other people, API rate limits |
+| `unofficial` | **any personal account** | Python 3.9+, `instagrapi`, a local sidecar | **violates Instagram's terms; the account can be banned** |
+
+`unofficial` is `lib/transport/unofficial.js` talking to `src/ig_bridge.py` over
+127.0.0.1. The password and the session cookie never enter the Node process, its config,
+its logs or a prompt — and the sidecar is the thing that decides how fast Instagram is
+touched. [The full warning and setup →](docs/UNOFFICIAL.md)
 
 <details>
 <summary><b>📝 Configuration (click)</b></summary>
@@ -100,7 +115,7 @@ Override the row in `~/.dsh/profiles/web/cordis.patch.yml`:
 ```yaml
 - id: ig-life
   config:
-    transport: dryrun          # dryrun | graph
+    transport: dryrun          # dryrun | graph | unofficial
     ownerHandle: your_main_account
     allowlist: [your_main_account]
     graph:
@@ -109,6 +124,12 @@ Override the row in `~/.dsh/profiles/web/cordis.patch.yml`:
       appSecret: ''
       verifyToken: ''
       publicBaseUrl: ''        # required for images and voice
+    unofficial:                # only used by transport: unofficial
+      baseUrl: http://127.0.0.1:8737
+      pollSeconds: 20          # floor 10 — a faster poll is how accounts get flagged
+      pollJitterSeconds: 6
+      sendPerDay: 30
+      sendGapSeconds: 8
     life:
       enabled: false           # turn on to give it a life of its own
       tickSeconds: 300
@@ -172,21 +193,23 @@ The owner can also send `/pause` `/resume` `/sleep` `/status` `/slang` `/people`
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | why a plugin instead of an external bridge; the two reply engines; graceful degradation |
 | [docs/MEMORY.md](docs/MEMORY.md) | the four tiers, retrieval scoring, sleep compression, tuning |
 | [docs/IG-SETUP.md](docs/IG-SETUP.md) | Meta app, webhook, voice/sticker/reel setup, the full error-code table |
+| [docs/UNOFFICIAL.md](docs/UNOFFICIAL.md) | the personal-account path: ban risk, sidecar setup, session reuse, error codes |
 | [docs/PRIVACY.md](docs/PRIVACY.md) | what is stored, what never leaves, anti-ban mechanics, risk register |
 | [CHANGELOG.md](CHANGELOG.md) | what changed in each version, and why |
 
 ## ✅ Verify
 
 ```bash
-node scripts/test.mjs          # 152 tests, 0 failures, no dependencies, no network
+node scripts/test.mjs          # 186 tests, 0 failures, no dependencies, no network
 node scripts/self-check.mjs    # end-to-end dry run with a scripted brain
 node scripts/loader-smoke.mjs  # boots under the real Cordis runtime
+python src/test_ig_bridge.py   # the unofficial sidecar: stdlib only, no instagrapi needed
 ```
 
 ## ⚠️ Honest limitations
 
 - The official Instagram API is **1:1 only** — no groups, no stickers, no forwards
-- The unofficial private API (password login) is **deliberately not included**: it violates Instagram's terms, and an account ban means the character dies with it
+- The unofficial private API **is** included now, as a separate opt-in transport (`transport: unofficial`). It violates Instagram's terms, the account can be banned, and the private protocol changes without notice — nothing about it is guaranteed to keep working. Use an account you can lose; see [docs/UNOFFICIAL.md](docs/UNOFFICIAL.md)
 - Instagram has no read-back API, so a voice message's `verified` only means "the send request succeeded"; the protocol requires falling back to text on failure
 - The `agent` engine has not yet been validated over a long-lived real DSH session; it degrades to the `llm` engine
 - Not included yet: understanding incoming voice notes, image generation, multi-platform sync

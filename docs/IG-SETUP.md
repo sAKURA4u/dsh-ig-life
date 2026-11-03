@@ -4,7 +4,10 @@
 > 如果你自己都覺得那個人煩，它就會被 IG 封。
 
 **官方 Graph API** 合規但門檻高；**非官方私有 API**（帳密登入）快但違反 IG 條款、會封號，
-本插件不內建。
+現在是獨立、預設關閉的 `transport: unofficial`，見 [UNOFFICIAL.md](UNOFFICIAL.md)。
+
+> **這一頁講的是官方 Graph 路線。** 如果你只有一個普通個人帳號（不是 Creator／Business），
+> 官方 API 不會服務你 —— 那條路在 [UNOFFICIAL.md](UNOFFICIAL.md)，連同它的封號風險。
 
 ## 路線 A：官方 Meta Graph API（合規）
 

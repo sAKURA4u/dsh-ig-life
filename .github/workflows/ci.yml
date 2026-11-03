@@ -70,3 +70,15 @@ jobs:
             if (!/^- insert:/m.test(text)) { console.error('patch must start with a patch list'); process.exit(1) }
             console.log('patch yaml looks right');
           "
+
+  sidecar:
+    # The unofficial transport's sidecar is stdlib-only on purpose, so it can be
+    # tested on a bare runner: no instagrapi, no network, no credentials.
+    name: python sidecar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile
+        run: python3 -m py_compile src/ig_bridge.py
+      - name: Sidecar tests
+        run: python3 src/test_ig_bridge.py

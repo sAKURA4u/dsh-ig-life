@@ -21,8 +21,10 @@
 <br />
 
 > **一分鐘示範**：不需要 IG 帳號、不需要 API key —— 這只示範它怎麼說話，不是正式使用。
-> 要真正收發私訊，需要 **一個 IG 專業帳號 + Meta App 的 long-lived token + 公開 HTTPS 隧道**，
-> 逐步指示見 [docs/IG-SETUP.md](docs/IG-SETUP.md)。你不需要交出密碼。
+> 要真正收發私訊，有兩副身體可以接：**官方**那一副（IG 專業帳號 + Meta App long-lived token +
+> 公開 HTTPS 隧道，見 [docs/IG-SETUP.md](docs/IG-SETUP.md)），或者**非官方**那一副
+> （普通個人帳號 + 本機 Python sidecar，見 [docs/UNOFFICIAL.md](docs/UNOFFICIAL.md)；
+> 違反 IG 條款，會封號）。插件本身永遠收不到你的密碼。
 >
 > ```bash
 > git clone https://github.com/sAKURA4u/dsh-ig-life && cd dsh-ig-life
@@ -83,11 +85,23 @@ dsh plugin --profile web add /path/to/dsh-ig-life
 重啟 DSH，日誌出現：
 
 ```text
-[ig-life] ready · transport=dryrun · engine=agent · tools=21 · webhook=/ig-life/webhook · life=off · memory=7
+[ig-life] ready · transport=dryrun · engine=agent · tools=21 · webhook=/ig-life/webhook · poll=off · life=off · memory=7
 ```
 
 **預設是 dryrun**：一個字都不會發去 IG，全部寫進 `~/.dsh/ig-life/outbox.jsonl`。
-先讀一個星期，覺得那個人值得認識，再改成 `transport: graph`。
+先讀一個星期，覺得那個人值得認識，再換一副真身體。
+
+### 三副身體，同一個角色
+
+| `transport` | 帳號 | 需要什麼 | 代價 |
+|---|---|---|---|
+| `dryrun` | 不用 | 什麼都不用 | 一個字都不發，只留 transcript |
+| `graph` | 專業帳號（Creator／Business） | Meta App、long-lived token、公開 HTTPS | 他人要用要過 App Review，有 API 限流 |
+| `unofficial` | **普通個人帳號** | Python 3.9+、`instagrapi`、本機 sidecar | **違反 IG 條款，會封號** |
+
+`unofficial` 就是 `lib/transport/unofficial.js` 透過 127.0.0.1 跟 `src/ig_bridge.py` 講話。
+密碼同 session cookie 永遠不進 Node 的 config、log 或提示詞 —— 而且「幾快碰 IG」是由 sidecar
+決定的。[完整警告與設定 →](docs/UNOFFICIAL.md)
 
 <details>
 <summary><b>📝 設定範例（點開）</b></summary>
@@ -97,7 +111,7 @@ dsh plugin --profile web add /path/to/dsh-ig-life
 ```yaml
 - id: ig-life
   config:
-    transport: dryrun          # dryrun | graph
+    transport: dryrun          # dryrun | graph | unofficial
     ownerHandle: your_main_account
     allowlist: [your_main_account]
     graph:
@@ -106,6 +120,12 @@ dsh plugin --profile web add /path/to/dsh-ig-life
       appSecret: ''
       verifyToken: ''
       publicBaseUrl: ''        # 發圖／語音需要公開 HTTPS
+    unofficial:                # 只有 transport: unofficial 會用到
+      baseUrl: http://127.0.0.1:8737
+      pollSeconds: 20          # 地板 10 —— 讀得更快就是封號的原因
+      pollJitterSeconds: 6
+      sendPerDay: 30
+      sendGapSeconds: 8
     life:
       enabled: false           # 想讓它自己生活才開
       tickSeconds: 300
@@ -169,21 +189,25 @@ seed.json       出世時就帶著的記憶（第一人稱）
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 為什麼是插件而不是外部橋接；兩種 reply engine；缺服務時如何降級 |
 | [docs/MEMORY.md](docs/MEMORY.md) | 四層記憶、檢索評分、睡眠壓縮、調參建議 |
 | [docs/IG-SETUP.md](docs/IG-SETUP.md) | Meta App、webhook、語音／表情包／Reels 設定、完整錯誤碼表 |
+| [docs/UNOFFICIAL.md](docs/UNOFFICIAL.md) | 普通個人帳號那條路：封號風險、sidecar 設定、session 重用、錯誤碼 |
 | [docs/PRIVACY.md](docs/PRIVACY.md) | 存什麼、不存什麼、防封號機制、風險台賬 |
 | [CHANGELOG.md](CHANGELOG.md) | 更新日記：每一版改了什麼、為什麼 |
 
 ## ✅ 驗證
 
 ```bash
-node scripts/test.mjs          # 152 tests · 0 fail · 零依賴、零網絡
+node scripts/test.mjs          # 186 tests · 0 fail · 零依賴、零網絡
 node scripts/self-check.mjs    # 端到端示範（dryrun + 假大腦）
 node scripts/loader-smoke.mjs  # 用真 Cordis 起一次，釘死載入契約
+python src/test_ig_bridge.py   # 非官方 sidecar：只用標準庫，不需要 instagrapi
 ```
 
 ## ⚠️ 已知限制（誠實）
 
 - IG 官方 API **只支援 1:1** —— 沒有群組、沒有 sticker、沒有 forward
-- 非官方私有 API（帳密登入）**刻意不內建**：違反 IG 條款、會封號，而帳號沒了角色就沒了
+- 非官方私有 API **現在內建了**，但是獨立、預設關閉的 `transport: unofficial`：違反 IG 條款、
+  會封號，而且私有協議隨時會改 —— 沒有任何部分保證一直可用。用一個可以失去的帳號，
+  見 [docs/UNOFFICIAL.md](docs/UNOFFICIAL.md)
 - IG 沒有回讀 API，所以語音的 `verified` 只代表「送出請求成功」；失敗時協議要求改打字
 - `agent` 引擎尚未在長期真實 DSH session 驗證；失敗會自動退回 `llm` 引擎
 - 還沒有：語音輸入理解、圖片生成、多平台同步

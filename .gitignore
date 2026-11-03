@@ -25,6 +25,12 @@ Thumbs.db
 # generated status report
 report.html
 
+# python sidecar
+__pycache__/
+*.pyc
+src/*-session.json
+src/ig-secrets.json
+
 # never commit a token
 gh-token.txt
 *.token

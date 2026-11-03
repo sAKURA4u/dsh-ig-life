@@ -20,6 +20,16 @@
 #       allowlist: [your_main_account]
 #       graph: { accessToken: '...', igUserId: '...', verifyToken: '...' }
 #       life: { enabled: true }
+#
+# 普通個人帳號（非官方私有 API，會封號，預設關閉）：
+#   - id: ig-life
+#     config:
+#       transport: unofficial
+#       ownerHandle: your_main_account
+#       allowlist: [your_main_account]
+#       webhook: { enabled: false }
+#       unofficial: { baseUrl: 'http://127.0.0.1:8737', pollSeconds: 20 }
+#   先讀 docs/UNOFFICIAL.md，並跑過 python src/ig_bridge.py --login。
 - insert:
     - id: ig-life
       name: dsh-ig-life

@@ -13,6 +13,15 @@
 | `bridge.json` | 已處理的訊息 id、最近 200 條 inbox 快取、今日用量 | 高（含對話原文） |
 | `outbox.jsonl` | 實際發出去的所有東西 | 高 |
 | `media/` | 發帖圖片 | 低 |
+| `unofficial-usage.json` | 非官方 transport 的每日計數（只有數字） | 低 |
+| `sidecar-token` | 本機 sidecar 的共享密鑰（`transport: unofficial`） | 高 |
+| `ig-secrets.json` | IG 帳號密碼 —— **只有 sidecar 讀，Node 永不接近** | 極高 |
+| `ig-session.json` | IG session cookies，等於登入狀態 | 極高 |
+| `ig-session-meta.json` | 上次登入時間／是否重用（給登入退避用） | 中 |
+| `ig-bridge-state.json` | 已處理訊息 id、每個 thread 的最後活動時間、每日用量 | 中 |
+
+`ig-secrets.json`、`ig-session.json`、`sidecar-token` 由 sidecar 以 0600 建立／寫入；
+如果密碼檔權限太寬，sidecar 會在日誌裡面警告。
 
 **沒有**寫入任何全域位置，**沒有**上傳到任何第三方，**沒有**遙測。
 刪掉這個資料夾就等於讓它失憶（連同你的人格設定一起，`persona/` 在專案目錄，不受影響）。
@@ -68,6 +77,10 @@
 | `bridge.maxAgentTurnsPerHour` | 每小時最多啟動幾輪 agent（預設 40，硬上限 40） |
 | webhook 去重 | 同一個 `mid` 只處理一次（Meta 會重試） |
 | 失敗不快轉 | Graph 限流回 `IG_RATE_LIMIT`，不會自動重試硬撞 |
+| 非官方：session 重用 + 登入退避 | 每次啟動先重用 `ig-session.json`；10 分鐘內不准第二次全新登入 |
+| 非官方：讀取地板 + 隨機 | `pollSeconds` ≥ 10，加 0–N 秒 jitter，instagrapi `delay_range` 1.5–4 秒 |
+| 非官方：兩層每日額度 + 發訊間隔 | Node 的 `unofficial.sendPerDay` 與 sidecar 的 `--send-per-day`，任何一道擋住都發不出 |
+| 非官方：上傳白名單 | sidecar `--media-root`（預設只有 `<dataDir>`），雜散路徑直接 403 |
 
 所有上限都是**每天**重置、本地時區計算。
 
@@ -89,3 +102,7 @@
 | 記憶檔損壞 | 角色失憶 | 原子寫入 + 損壞檔隔離不刪除 |
 | 提示詞注入（陌生人叫它洩漏設定） | 洩漏系統提示 | `sanitizeOutbound` + `boundaries.md` + 陌生人預設不回 |
 | 模型幻覺發帖 | 公開發布錯誤內容 | `limits.postsPerDay`、`postMinGapHours`、先 dryrun 讀 outbox |
+| 非官方帳號被停用 | 角色失去身體 | 只建議用小號；兩層額度、讀取地板、session 重用；記憶留在 `<dataDir>`，換身體可以繼續 |
+| 本機其他程式冒充插件呼叫 sidecar | 代你發訊、讀你的對話 | sidecar 只聽 127.0.0.1、每個請求都要 token、token 檔 0600 |
+| 誤把整部機的檔案上傳去 IG | 私人檔案外洩 | sidecar 的 media-root 白名單，預設只有 `<dataDir>` |
+| 密碼寫進 log／對話 | 帳號被接管 | 密碼只存在 `ig-secrets.json`；Node 不讀；`sanitizeOutbound` 擋 `password=` 形狀；`describeConfig()` 遮罩 token |
