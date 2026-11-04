@@ -55,7 +55,8 @@ test('daily budget stops replies before the transport is touched', async () => {
     llm: fakeLlm(['唔應該出街']),
   })
   world.bridge.usage.dm = 1
-  const summary = await world.bridge.ingest([dmEvent()])
+  // The owner bypasses the cap on purpose; a known non-owner still hits it.
+  const summary = await world.bridge.ingest([dmEvent({ username: 'friend' })])
   assert.equal(summary.handled, 0)
   assert.equal(world.transport.sent.length, 0)
 })
