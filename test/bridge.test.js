@@ -51,9 +51,10 @@ test('strangers are ignored by default and answered in safe mode when allowed', 
 
 test('daily budget stops replies before the transport is touched', async () => {
   const world = await makeWorld({
-    configOverrides: { limits: { dmPerDay: 0, postsPerDay: 1, commentsPerDay: 1, replyCooldownSeconds: 0 } },
+    configOverrides: { limits: { dmPerDay: 1, postsPerDay: 1, commentsPerDay: 1, replyCooldownSeconds: 0 } },
     llm: fakeLlm(['唔應該出街']),
   })
+  world.bridge.usage.dm = 1
   const summary = await world.bridge.ingest([dmEvent()])
   assert.equal(summary.handled, 0)
   assert.equal(world.transport.sent.length, 0)
@@ -147,4 +148,15 @@ test('extractAssistantText tolerates several event shapes', () => {
   assert.equal(extractAssistantText({ type: 'assistant/chunk', data: { text: 'x' } }), '')
   assert.equal(extractAssistantText({ type: 'tool/call', data: { text: 'x' } }), '')
   assert.equal(extractAssistantText(null), '')
+})
+
+
+test('dmPerDay 0 means unlimited, so the owner is never counted out', async () => {
+  const world = await makeWorld({
+    configOverrides: { limits: { dmPerDay: 0, postsPerDay: 1, commentsPerDay: 1, replyCooldownSeconds: 0 } },
+    llm: fakeLlm(['喂']),
+  })
+  world.bridge.usage.dm = 99
+  const summary = await world.bridge.ingest([dmEvent()])
+  assert.equal(summary.handled, 1)
 })
