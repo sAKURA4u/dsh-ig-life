@@ -223,3 +223,33 @@ test('a group is spoken to only when called or interested', async () => {
   // Interested dice but bad mood -> stays quiet.
   assert.equal(bridge.groupShouldSpeak({ text: '有冇人食飯', selfHandle: 'norma', valence: 0.1, random: () => 0.01 }), false)
 })
+
+
+test('the thread transcript keeps both sides in order', async () => {
+  const { bridge } = await makeWorld()
+  bridge.rememberExchange('thread-t', 'them', '你而家能幫自己改 bio 嗎')
+  bridge.rememberExchange('thread-t', 'me', '可以呀，我自己改得到')
+  bridge.rememberExchange('thread-t', 'them', '我叫你改簡介啊')
+
+  const block = bridge.renderTranscript('thread-t')
+  assert.match(block, /佢：你而家能幫自己改 bio 嗎/)
+  assert.match(block, /我：可以呀，我自己改得到/)
+  assert.match(block, /佢：我叫你改簡介啊/)
+})
+
+test('a sent reply is written into the transcript', async () => {
+  const sent = []
+  const { bridge } = await makeWorld({
+    transport: {
+      async sendDm({ text }) {
+        sent.push(text)
+        return { id: 'm1' }
+      },
+    },
+  })
+  await bridge.sendReply('thread-x', '得啦\n搞掂同你講', { username: 'owner' })
+  const lines = bridge.recentTranscript('thread-x')
+  assert.equal(lines.length, 1)
+  assert.equal(lines[0].role, 'me')
+  assert.match(lines[0].text, /得啦/)
+})
