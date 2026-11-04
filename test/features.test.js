@@ -75,7 +75,7 @@ test('the bundled example is never modified', async () => {
 test('the reply delay is part of the editable settings', () => {
   const { config } = resolveConfig({ transport: 'dryrun' })
   const editable = pickEditable(config)
-  assert.deepEqual(editable.bridge.replyDelaySeconds, { min: 2, max: 12 })
+  assert.deepEqual(editable.bridge.replyDelaySeconds, { min: 0, max: 180 })
 
   const dir = tempDir('ig-life-delay-')
   const saved = saveOverlay(dir, { bridge: { replyDelaySeconds: { min: 4, max: 9 } } })
@@ -165,4 +165,48 @@ test('a reel is picked from the library and actually sent', async () => {
   const result = await bridge.shareReel({ threadId: 'reel-thread' })
   assert.equal(result.ok, true, JSON.stringify(result))
   assert.ok(String(result.text).includes(link))
+})
+
+
+test('a multi-line reply becomes separate messages, not newlines', async () => {
+  const sent = []
+  const { bridge } = await makeWorld({
+    transport: {
+      async sendDm({ text }) {
+        sent.push(text)
+        return { id: 'm1' }
+      },
+    },
+  })
+  const result = await bridge.sendReply('thread-1', '喂\n你係咪想我發 reel？', { username: 'owner' })
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.deepEqual(sent, ['喂', '你係咪想我發 reel？'])
+})
+
+test('a live conversation is answered faster than a cold one', async () => {
+  const { bridge } = await makeWorld()
+  bridge.config.bridge.replyDelaySeconds = { min: 0, max: 180 }
+  bridge.life.state.valence = 0.6
+
+  const cold = bridge.replyDelaySeconds({ threadId: 'cold-thread' })
+  bridge.inbox.push({ threadId: 'hot-thread', at: new Date(Date.now() - 30_000).toISOString() })
+  const hot = bridge.replyDelaySeconds({ threadId: 'hot-thread' })
+
+  assert.ok(hot < 10, `hot was ${hot}`)
+  assert.ok(cold > 10, `cold was ${cold}`)
+})
+
+test('mood never makes it ignore the owner', async () => {
+  const { bridge } = await makeWorld()
+  bridge.life.state.valence = -0.6
+  assert.ok(bridge.moodSkipChance({ owner: false }) > 0)
+  assert.equal(bridge.moodSkipChance({ owner: true }), 0)
+})
+
+test('the vision endpoint is editable settings', () => {
+  const { config } = resolveConfig({ transport: 'dryrun' })
+  const editable = pickEditable(config)
+  assert.ok('baseUrl' in editable.vision)
+  assert.ok('model' in editable.vision)
+  assert.equal(editable.vision.apiKey, '')
 })
