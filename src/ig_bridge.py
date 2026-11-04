@@ -1022,6 +1022,37 @@ class Bridge:
             "threadId": str(_get(message, "thread_id", "") or ""),
         }
 
+    def account(self, payload: dict) -> dict:
+        """The character's own account: name, bio, avatar, private/public."""
+        name = payload.get("name")
+        biography = payload.get("biography")
+        photo = str(payload.get("photoPath") or "").strip()
+        privacy = str(payload.get("privacy") or "").strip().lower()
+        if privacy not in ("", "private", "public"):
+            raise BridgeError("IG_BAD_PRIVACY", "privacy 只可以是 private 或 public", "", 400)
+        if name is None and biography is None and not photo and not privacy:
+            raise BridgeError("IG_EMPTY_ACCOUNT", "沒有要改的東西", "給 name、biography、photoPath 或 privacy", 400)
+        if biography is not None and len(str(biography)) > 150:
+            raise BridgeError("IG_BIO_TOO_LONG", "bio 超過 150 字", "IG 的上限是 150 字", 400)
+        photo_path = self._resolve_media_path(photo) if photo else None
+        with self._api_lock:
+            client = self.ensure_client()
+            try:
+                if privacy == "private":
+                    client.account_set_private()
+                elif privacy == "public":
+                    client.account_set_public()
+                if photo_path is not None:
+                    client.account_change_picture(str(photo_path))
+                if name is not None or biography is not None:
+                    client.account_edit(
+                        full_name=None if name is None else str(name),
+                        biography=None if biography is None else str(biography),
+                    )
+            except Exception as error:
+                raise _map_exception(error)
+        return {"ok": True, "name": name, "biography": biography, "avatar": bool(photo_path), "privacy": privacy or None}
+
     def reply_comment(self, payload: dict) -> dict:
         text = str(payload.get("text") or "").strip()
         comment_id = str(payload.get("commentId") or "").strip()
@@ -1265,6 +1296,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not media_id:
                     raise BridgeError("IG_NO_MEDIA_ID", "mediaId 不能空白", "帶 ?mediaId=...", 400)
                 self._send_json(200, bridge.media(media_id))
+                return
+            if method == "POST" and route == "/account":
+                self._send_json(200, bridge.account(self._read_body()))
                 return
             if method == "POST" and route == "/story":
                 self._send_json(200, bridge.story(self._read_body()))

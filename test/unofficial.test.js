@@ -311,6 +311,24 @@ test('media info is read from the sidecar, not the Graph API', async () => {
   assert.equal(info.code, 'R1')
 })
 
+test('the account can be made private and have its bio changed', async () => {
+  const fetchImpl = fakeFetch({
+    'POST /account': { ok: true, name: 'Norma', biography: '夜', privacy: 'private' },
+  })
+  const { transport } = await harness({ fetchImpl })
+  const result = await transport.updateAccount({ privacy: 'private', biography: '夜' })
+  assert.equal(result.privacy, 'private')
+  assert.equal(fetchImpl.last().body.privacy, 'private')
+  assert.equal(fetchImpl.last().body.biography, '夜')
+})
+
+test('an empty account change is refused before the request', async () => {
+  const fetchImpl = fakeFetch({})
+  const { transport } = await harness({ fetchImpl })
+  await assert.rejects(() => transport.updateAccount({}), (error) => error.code === 'IG_EMPTY_ACCOUNT')
+  assert.equal(fetchImpl.calls.length, 0)
+})
+
 // --------------------------------------------------------------------- story
 test('a story is posted with the local image path and recorded', async () => {
   const fetchImpl = fakeFetch({ 'POST /story': { ok: true, mediaId: 's1', permalink: 'https://www.instagram.com/p/s1/' } })

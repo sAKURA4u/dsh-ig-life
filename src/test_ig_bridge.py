@@ -136,6 +136,14 @@ class FakeClient:
         self.last_picture = path
         return True
 
+    def account_set_private(self):
+        self.private = True
+        return True
+
+    def account_set_public(self):
+        self.private = False
+        return True
+
     def media_comment(self, media_id, text, replied_to_comment_id=None):
         return SimpleNamespace(pk="comment-1")
 
@@ -499,6 +507,22 @@ class SidecarTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["threadId"], "tid1")
         self.assertEqual(self.fake.dm, ("hello", [42]))
+
+    def test_the_account_can_be_made_private(self):
+        status, payload = self.request("POST", "/account", {"privacy": "private"})
+        self.assertEqual(status, 200)
+        self.assertTrue(self.fake.private)
+        self.assertEqual(payload["privacy"], "private")
+
+    def test_the_account_bio_can_be_edited(self):
+        status, payload = self.request("POST", "/account", {"biography": "夜晚出沒"})
+        self.assertEqual(status, 200)
+        self.assertEqual(self.fake.last_profile.get("biography"), "夜晚出沒")
+
+    def test_an_empty_account_change_is_refused(self):
+        status, payload = self.request("POST", "/account", {})
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["code"], "IG_EMPTY_ACCOUNT")
 
     # ---- misc
     def test_unknown_route_is_a_404_with_a_code(self):

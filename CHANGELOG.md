@@ -4,6 +4,22 @@
 
 ---
 
+## [0.5.3] — 2026-11-04
+
+### 新增
+
+- **`ig_account`：控制自己的帳號** — 顯示名稱、bio（150 字）、頭像、**私人／公開**。
+  sidecar `POST /account`（`account_set_private` / `account_set_public` / `account_edit` /
+  `account_change_picture`）；`ig_profile` 保留為舊名。
+- **提示詞寫清楚** — 「自己的帳號：`ig_account` 改名／bio／頭像／私人公開；`ig_post` 發帖；
+  `ig_story` 限時動態。你控制得到自己的帳號，唔好話『我改唔到』。」之前它會口頭否認，
+  因為提示詞從來冇講過它有這些能力。
+
+### 限制
+
+- IG 唔准經 API 改 **username**；改名要用人手。
+- 私人／公開切換依賴 instagrapi 3.x 的 `account_set_private`。
+
 ## [0.5.2] — 2026-11-04
 
 ### 修正
