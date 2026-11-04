@@ -4,6 +4,16 @@
 
 ---
 
+## [0.5.4] — 2026-11-04
+
+### 新增
+
+- **`bridge.log`** — plugin 自己的 log 現在會寫入 `<dataDir>/bridge.log`（0600），
+  帶 ISO 時間戳同 level；2 MB 上限，超過就輪替到 `bridge.log.1`。
+  secret（sessionid／password／token／api key）寫入前會換成 `[redacted]`。
+  寫入失敗永遠不會拖死回覆流程。
+  之前「點解唔回」只能靠堆測，因為 host logger 只去 console、唔會落檔。
+
 ## [0.5.3] — 2026-11-04
 
 ### 新增
