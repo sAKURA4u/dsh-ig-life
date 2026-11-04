@@ -210,3 +210,16 @@ test('the vision endpoint is editable settings', () => {
   assert.ok('model' in editable.vision)
   assert.equal(editable.vision.apiKey, '')
 })
+
+
+test('a group is spoken to only when called or interested', async () => {
+  const { bridge } = await makeWorld()
+  // Not mentioned, no interest dice -> silent.
+  assert.equal(bridge.groupShouldSpeak({ text: '今日好忙', selfHandle: 'norma', valence: 0.8, random: () => 0.99 }), false)
+  // Named -> speaks even at random 0.99.
+  assert.equal(bridge.groupShouldSpeak({ text: '喂 @norma 你點睇', selfHandle: 'norma', valence: 0, random: () => 0.99 }), true)
+  // Interested dice and a decent mood -> speaks.
+  assert.equal(bridge.groupShouldSpeak({ text: '有冇人食飯', selfHandle: 'norma', valence: 0.8, random: () => 0.01 }), true)
+  // Interested dice but bad mood -> stays quiet.
+  assert.equal(bridge.groupShouldSpeak({ text: '有冇人食飯', selfHandle: 'norma', valence: 0.1, random: () => 0.01 }), false)
+})

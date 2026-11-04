@@ -82,6 +82,38 @@ class FakeClient:
     def photo_upload(self, path, caption):
         return SimpleNamespace(pk="999", code="ABC123")
 
+    def user_id_from_username(self, username):
+        return "42"
+
+    def user_follow(self, user_id):
+        self.followed = user_id
+        return True
+
+    def user_unfollow(self, user_id):
+        self.unfollowed = user_id
+        return True
+
+    def user_follow_requests(self, amount=0):
+        return [SimpleNamespace(pk=7, username="fan", full_name="Fan", is_private=True)]
+
+    def user_follow_request_approve(self, user_id):
+        self.approved = user_id
+        return True
+
+    def user_follow_request_decline(self, user_id):
+        self.declined = user_id
+        return True
+
+    def direct_send(self, text, user_ids=None, thread_ids=None, usernames=None):
+        target = {}
+        if thread_ids:
+            target["thread_ids"] = thread_ids
+        if usernames:
+            target["usernames"] = usernames
+        self.last_send = (text, target)
+        self.dm = (text, list(user_ids or []))
+        return SimpleNamespace(id="sent-1", thread_id="tid1")
+
     def media_info(self, media_id):
         return SimpleNamespace(
             pk=int(media_id or 0),
@@ -444,6 +476,29 @@ class SidecarTest(unittest.TestCase):
         status, payload = self.request("GET", "/media")
         self.assertEqual(status, 400)
         self.assertEqual(payload["code"], "IG_NO_MEDIA_ID")
+
+    def test_following_and_unfollowing(self):
+        status, payload = self.request("POST", "/follow", {"username": "friend"})
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(self.fake.followed, "42")
+        status, _ = self.request("POST", "/follow", {"username": "friend", "action": "unfollow"})
+        self.assertEqual(status, 200)
+        self.assertEqual(self.fake.unfollowed, "42")
+
+    def test_follow_requests_are_listed_and_approved(self):
+        status, payload = self.request("GET", "/follow-requests")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["requests"][0]["username"], "fan")
+        status, payload = self.request("POST", "/follow-request", {"username": "fan", "action": "approve"})
+        self.assertEqual(status, 200)
+        self.assertEqual(self.fake.approved, "42")
+
+    def test_a_dm_can_be_started_by_username(self):
+        status, payload = self.request("POST", "/dm-user", {"username": "friend", "text": "hello"})
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["threadId"], "tid1")
+        self.assertEqual(self.fake.dm, ("hello", [42]))
 
     # ---- misc
     def test_unknown_route_is_a_404_with_a_code(self):

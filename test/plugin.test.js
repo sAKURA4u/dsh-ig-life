@@ -82,6 +82,7 @@ test('apply mounts the webhook and the tick when asked to', async () => {
   assert.ok(paths.includes('/ig-life/webhook'), 'webhook route')
   assert.ok(paths.includes('/ig-life/media'), 'media route')
   assert.ok(paths.includes('/ig-life/console'), 'console page') // the rest of the routes are its JSON API
+  assert.ok(paths.includes('/ig-life/console/api/persona'), 'persona editor route')
   assert.equal(calls.intervals.length, 1)
   assert.equal(calls.intervals[0].ms, 30_000)
 })

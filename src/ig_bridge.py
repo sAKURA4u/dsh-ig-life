@@ -371,7 +371,7 @@ def _share_attachment(message) -> dict:
     return _attachment("share", _shortcode_url(str(code)) if code else "", media_id)
 
 
-def normalise_message(message, thread_id: str, users: dict, me_id: int):
+def normalise_message(message, thread_id: str, users: dict, me_id: int, is_group: bool = False, thread_title: str = ""):
     """
     One instagrapi DirectMessage → the event shape the Node bridge already knows.
     Returns None for our own messages and for entries with nothing to say.
@@ -428,6 +428,8 @@ def normalise_message(message, thread_id: str, users: dict, me_id: int):
         "at": _iso(_get(message, "timestamp")),
         "attachments": attachments,
         "isEcho": False,
+        "isGroup": bool(is_group),
+        "threadTitle": thread_title or "",
     }
 
 
@@ -672,17 +674,15 @@ class Bridge:
             seen = set(self._state.get("seenIds") or [])
             known_threads = dict(self._state.get("threads") or {})
             collected: list = []
-            skipped_groups = 0
             touched: dict = {}
             cutoff = time.time() - 7 * 86400
 
             for thread in threads[:MAX_THREADS_PER_POLL]:
-                if bool(_get(thread, "is_group", False)):
-                    skipped_groups += 1
-                    continue
                 thread_id = str(_first(_get(thread, "id"), _get(thread, "thread_id")))
                 if not thread_id:
                     continue
+                is_group = bool(_get(thread, "is_group", False)) or len(_get(thread, "users", None) or []) > 2
+                thread_title = str(_get(thread, "thread_title", "") or "")
                 activity = _to_epoch(_get(thread, "last_activity_at", None))
                 last_seen = float(known_threads.get(thread_id) or 0)
                 if activity and last_seen and activity <= last_seen + 0.5:
@@ -724,7 +724,7 @@ class Bridge:
 
                 items = [
                     item
-                    for item in (normalise_message(message, thread_id, users, me_id) for message in messages or [])
+                    for item in (normalise_message(message, thread_id, users, me_id, is_group=is_group, thread_title=thread_title) for message in messages or [])
                     if item is not None and item["id"] and item["id"] not in seen
                 ]
                 # First sight of a thread must not dump a week of history into one
@@ -759,7 +759,7 @@ class Bridge:
                 "messages": collected,
                 "cursor": self._cache["cursor"],
                 "throttled": False,
-                "skippedGroups": skipped_groups,
+                "skippedGroups": 0,
                 "fetchedAt": self._cache["fetchedAt"],
             }
 
@@ -947,6 +947,80 @@ class Bridge:
             except Exception as error:
                 raise _map_exception(error)
         return {"ok": True, "name": name, "biography": biography, "avatar": bool(photo_path)}
+
+    def _user_id(self, client, username: str) -> str:
+        handle = str(username or "").strip().lstrip("@").lower()
+        if not handle:
+            raise BridgeError("IG_NO_USERNAME", "要一個 username", "例如 houak_", 400)
+        try:
+            return str(client.user_id_from_username(handle))
+        except Exception as error:
+            raise _map_exception(error)
+
+    def follow(self, payload: dict) -> dict:
+        username = str(payload.get("username") or "").strip()
+        action = str(payload.get("action") or "follow").strip().lower()
+        with self._api_lock:
+            client = self.ensure_client()
+            user_id = self._user_id(client, username)
+            try:
+                done = client.user_unfollow(user_id) if action == "unfollow" else client.user_follow(user_id)
+            except Exception as error:
+                raise _map_exception(error)
+        return {"ok": bool(done), "username": username.lstrip("@"), "action": action, "userId": user_id}
+
+    def follow_requests(self) -> dict:
+        with self._api_lock:
+            client = self.ensure_client()
+            try:
+                users = client.user_follow_requests()
+            except Exception as error:
+                raise _map_exception(error)
+        return {
+            "ok": True,
+            "requests": [
+                {
+                    "username": str(_get(user, "username", "") or ""),
+                    "fullName": str(_get(user, "full_name", "") or ""),
+                    "userId": str(_get(user, "pk", "") or ""),
+                    "private": bool(_get(user, "is_private", False)),
+                }
+                for user in users
+            ],
+        }
+
+    def follow_request(self, payload: dict) -> dict:
+        username = str(payload.get("username") or "").strip()
+        action = str(payload.get("action") or "approve").strip().lower()
+        with self._api_lock:
+            client = self.ensure_client()
+            user_id = self._user_id(client, username)
+            try:
+                done = client.user_follow_request_decline(user_id) if action == "decline" else client.user_follow_request_approve(user_id)
+            except Exception as error:
+                raise _map_exception(error)
+        return {"ok": bool(done), "username": username.lstrip("@"), "action": action, "userId": user_id}
+
+    def dm_user(self, payload: dict) -> dict:
+        username = str(payload.get("username") or "").strip()
+        text = str(payload.get("text") or "").strip()
+        if not text:
+            raise BridgeError("IG_EMPTY_MESSAGE", "空訊息", "寫點東西", 400)
+        with self._api_lock:
+            client = self.ensure_client()
+            self.check_cap("dm")
+            user_id = self._user_id(client, username)
+            try:
+                message = client.direct_send(text, [int(user_id)])
+            except Exception as error:
+                raise _map_exception(error)
+        return {
+            "ok": True,
+            "username": username.lstrip("@"),
+            "userId": user_id,
+            "messageId": str(_get(message, "id", "") or _get(message, "pk", "") or ""),
+            "threadId": str(_get(message, "thread_id", "") or ""),
+        }
 
     def reply_comment(self, payload: dict) -> dict:
         text = str(payload.get("text") or "").strip()
@@ -1172,6 +1246,18 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if method == "POST" and route == "/send_media":
                 self._send_json(200, bridge.send_media(self._read_body()))
+                return
+            if method == "POST" and route == "/follow":
+                self._send_json(200, bridge.follow(self._read_body()))
+                return
+            if method == "POST" and route == "/follow-request":
+                self._send_json(200, bridge.follow_request(self._read_body()))
+                return
+            if method == "GET" and route == "/follow-requests":
+                self._send_json(200, bridge.follow_requests())
+                return
+            if method == "POST" and route == "/dm-user":
+                self._send_json(200, bridge.dm_user(self._read_body()))
                 return
             if method == "GET" and route == "/media":
                 query = parse_qs(urlparse(self.path).query)
