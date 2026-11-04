@@ -4,6 +4,13 @@
 
 ---
 
+## [0.5.5] — 2026-11-04
+
+### 修正
+
+- **`bridge.log` 冇出現** — logger 用了 `config.dataDir`，但多數 profile 是空的；
+  實際目錄由 `pluginDataDir()` 解析。現在會寫入 `<dataDir>/bridge.log`（即 `~/.dsh/ig-life/bridge.log`）。
+
 ## [0.5.4] — 2026-11-04
 
 ### 新增
